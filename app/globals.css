@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-primary-light: #3b82f6;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #2563eb;
+  
+  /* Risk badge colors */
+  --color-risk-low: #16a34a;
+  --color-risk-medium: #d97706;
+  --color-risk-high: #dc2626;
+
+  /* Status colors */
+  --color-status-not-started: #6b7280;
+  --color-status-submitted: #2563eb;
+  --color-status-in-review: #7c3aed;
+  --color-status-info-requested: #d97706;
+  --color-status-approved: #16a34a;
+  --color-status-rejected: #dc2626;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}

@@ -1,0 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────
+
+enum Role {
+  applicant
+  officer
+}
+
+enum Sector {
+  manufacturing
+  chemical
+  food_processing
+  textiles
+  pharma
+  other
+}
+
+enum Scale {
+  micro
+  small
+  medium
+  large
+}
+
+enum RiskCategory {
+  green
+  white
+  orange
+  red
+}
+
+enum Stage {
+  new_unit
+  expansion
+  operational
+}
+
+enum ApplicationStatus {
+  not_started
+  submitted
+  in_review
+  info_requested
+  approved
+  rejected
+}
+
+// ─── Models ──────────────────────────────────────
+
+model User {
+  id                String   @id @default(cuid())
+  name              String?
+  email             String?  @unique
+  phone             String?  @unique
+  role              Role     @default(applicant)
+  officerDepartment String?  @map("officer_department")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  profile      ApplicantProfile?
+  applications Application[]
+
+  @@map("users")
+}
+
+model ApplicantProfile {
+  id                     String       @id @default(cuid())
+  userId                 String       @unique @map("user_id")
+  sector                 Sector
+  scale                  Scale
+  locationDistrict       String       @map("location_district")
+  inNotifiedIndustrialZone Boolean    @map("in_notified_industrial_zone")
+  riskCategory           RiskCategory @map("risk_category")
+  stage                  Stage
+  createdAt              DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("applicant_profiles")
+}
+
+model ApprovalType {
+  id          String  @id @default(cuid())
+  name        String
+  department  String
+  description String
+  dependsOnId String? @map("depends_on_id")
+
+  dependsOn   ApprovalType?  @relation("ApprovalDependency", fields: [dependsOnId], references: [id])
+  dependedBy  ApprovalType[] @relation("ApprovalDependency")
+  rules       ApprovalRule[]
+  applications Application[]
+
+  @@map("approval_types")
+}
+
+model ApprovalRule {
+  id                   String        @id @default(cuid())
+  approvalTypeId       String        @map("approval_type_id")
+  appliesToSector      Sector?       @map("applies_to_sector")
+  appliesToScale       Scale?        @map("applies_to_scale")
+  appliesToRiskCategory RiskCategory? @map("applies_to_risk_category")
+  appliesToZone        Boolean?      @map("applies_to_zone")
+  isSelfCertifiable    Boolean       @default(false) @map("is_self_certifiable")
+
+  approvalType ApprovalType @relation(fields: [approvalTypeId], references: [id])
+
+  @@map("approval_rules")
+}
+
+model Application {
+  id                String            @id @default(cuid())
+  applicantId       String            @map("applicant_id")
+  approvalTypeId    String            @map("approval_type_id")
+  status            ApplicationStatus @default(not_started)
+  riskCategory      RiskCategory      @map("risk_category")
+  assignedOfficerDept String?         @map("assigned_officer_dept")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  applicant    User         @relation(fields: [applicantId], references: [id])
+  approvalType ApprovalType @relation(fields: [approvalTypeId], references: [id])
+
+  @@map("applications")
+}
+
+model Scheme {
+  id                String  @id @default(cuid())
+  name              String
+  description       String
+  eligibilitySector Sector? @map("eligibility_sector")
+  eligibilityScale  Scale?  @map("eligibility_scale")
+  eligibilityDistrict String? @map("eligibility_district")
+  subsidyDetail     String  @map("subsidy_detail")
+  sourceUrl         String  @map("source_url")
+
+  @@map("schemes")
+}
