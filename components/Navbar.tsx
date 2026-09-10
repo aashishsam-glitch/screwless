@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import ProfilePopup from './ProfilePopup'
 
 interface UserInfo {
   id: string
@@ -14,7 +15,9 @@ interface UserInfo {
 
 export default function Navbar() {
   const [user, setUser] = useState<UserInfo | null>(null)
+  const [showPopup, setShowPopup] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -31,11 +34,13 @@ export default function Navbar() {
     router.push('/login')
   }
 
+  const isActive = (path: string) => pathname === path
+
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6">
             <a href="/" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">⚙</span>
@@ -45,21 +50,57 @@ export default function Navbar() {
                 <p className="text-xs text-gray-500 leading-tight -mt-0.5">Industrial Approvals Platform</p>
               </div>
             </a>
+
+            {/* Nav links for applicants */}
+            {user && user.role === 'applicant' && (
+              <div className="hidden sm:flex items-center gap-1">
+                <a
+                  href="/dashboard"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/dashboard') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  Dashboard
+                </a>
+                <a
+                  href="/vault"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/vault') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  📁 Document Vault
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
             {user ? (
               <>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-700">
-                    {user.name || user.email || user.phone}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {user.role === 'officer' 
-                      ? `Officer • ${formatDepartment(user.officerDepartment)}`
-                      : 'Applicant'
-                    }
-                  </p>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPopup(!showPopup)}
+                    className="text-right cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    <p className="text-sm font-medium text-gray-700">
+                      {user.name || user.email || user.phone}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {user.role === 'officer' 
+                        ? `Officer • ${formatDepartment(user.officerDepartment)}`
+                        : 'Applicant ▾'
+                      }
+                    </p>
+                  </button>
+                  {showPopup && user.role === 'applicant' && (
+                    <ProfilePopup
+                      userId={user.id}
+                      userName={user.name}
+                      userEmail={user.email}
+                      userPhone={user.phone}
+                      onClose={() => setShowPopup(false)}
+                    />
+                  )}
                 </div>
                 <button
                   onClick={handleLogout}

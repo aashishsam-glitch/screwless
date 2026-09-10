@@ -1,11 +1,19 @@
 import { PrismaClient, Sector, Scale, RiskCategory, Stage } from '@prisma/client'
 
+const { encryptField } = require('../lib/crypto')
+
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🌱 Seeding database...')
 
   // Clear existing data
+  await prisma.documentComment.deleteMany()
+  await prisma.applicationDocument.deleteMany()
+  await prisma.approvalTypeDocumentRequirement.deleteMany()
+  await prisma.document.deleteMany()
+  await prisma.businessInfo.deleteMany()
+  await prisma.personalInfo.deleteMany()
   await prisma.application.deleteMany()
   await prisma.approvalRule.deleteMany()
   await prisma.approvalType.deleteMany()
@@ -332,6 +340,135 @@ async function main() {
     ],
   })
   console.log(`✅ Created ${schemes.count} schemes`)
+
+  // ─── Document Requirements per Approval Type ────
+  const docReqs = await prisma.approvalTypeDocumentRequirement.createMany({
+    data: [
+      // Building Plan Approval
+      { approvalTypeId: buildingPlan.id, documentType: 'land_ownership_proof', isMandatory: true },
+      { approvalTypeId: buildingPlan.id, documentType: 'building_plan_copy', isMandatory: true },
+      { approvalTypeId: buildingPlan.id, documentType: 'pan', isMandatory: true },
+      { approvalTypeId: buildingPlan.id, documentType: 'aadhar', isMandatory: false },
+
+      // Factory License
+      { approvalTypeId: factoryLicense.id, documentType: 'pan', isMandatory: true },
+      { approvalTypeId: factoryLicense.id, documentType: 'gstin_certificate', isMandatory: true },
+      { approvalTypeId: factoryLicense.id, documentType: 'land_ownership_proof', isMandatory: true },
+      { approvalTypeId: factoryLicense.id, documentType: 'factory_layout_plan', isMandatory: true },
+      { approvalTypeId: factoryLicense.id, documentType: 'building_plan_copy', isMandatory: false },
+
+      // Fire NOC
+      { approvalTypeId: fireNOC.id, documentType: 'building_plan_copy', isMandatory: true },
+      { approvalTypeId: fireNOC.id, documentType: 'fire_safety_layout', isMandatory: true },
+      { approvalTypeId: fireNOC.id, documentType: 'noc_previous', isMandatory: false },
+
+      // Pollution NOC
+      { approvalTypeId: pollutionNOC.id, documentType: 'factory_layout_plan', isMandatory: true },
+      { approvalTypeId: pollutionNOC.id, documentType: 'pollution_control_cert', isMandatory: true },
+      { approvalTypeId: pollutionNOC.id, documentType: 'water_usage_plan', isMandatory: false },
+
+      // Electricity Connection
+      { approvalTypeId: electricityConn.id, documentType: 'land_ownership_proof', isMandatory: true },
+      { approvalTypeId: electricityConn.id, documentType: 'electricity_bill', isMandatory: false },
+      { approvalTypeId: electricityConn.id, documentType: 'pan', isMandatory: true },
+
+      // Labour Registration
+      { approvalTypeId: labourReg.id, documentType: 'pan', isMandatory: true },
+      { approvalTypeId: labourReg.id, documentType: 'aadhar', isMandatory: true },
+      { approvalTypeId: labourReg.id, documentType: 'gstin_certificate', isMandatory: false },
+      { approvalTypeId: labourReg.id, documentType: 'labour_license_copy', isMandatory: false },
+
+      // Water NOC
+      { approvalTypeId: waterNOC.id, documentType: 'water_usage_plan', isMandatory: true },
+      { approvalTypeId: waterNOC.id, documentType: 'land_ownership_proof', isMandatory: true },
+      { approvalTypeId: waterNOC.id, documentType: 'pollution_control_cert', isMandatory: false },
+
+      // Land Allotment
+      { approvalTypeId: landAllotment.id, documentType: 'pan', isMandatory: true },
+      { approvalTypeId: landAllotment.id, documentType: 'aadhar', isMandatory: true },
+      { approvalTypeId: landAllotment.id, documentType: 'incorporation_cert', isMandatory: false },
+
+      // Shops & Establishment
+      { approvalTypeId: shopsReg.id, documentType: 'pan', isMandatory: true },
+      { approvalTypeId: shopsReg.id, documentType: 'aadhar', isMandatory: true },
+      { approvalTypeId: shopsReg.id, documentType: 'electricity_bill', isMandatory: false },
+
+      // GST Registration
+      { approvalTypeId: gstReg.id, documentType: 'pan', isMandatory: true },
+      { approvalTypeId: gstReg.id, documentType: 'aadhar', isMandatory: true },
+      { approvalTypeId: gstReg.id, documentType: 'incorporation_cert', isMandatory: false },
+      { approvalTypeId: gstReg.id, documentType: 'udyam_certificate', isMandatory: false },
+    ],
+  })
+  console.log(`✅ Created ${docReqs.count} document requirements`)
+
+  // ─── Demo Applicant Personal & Business Info ────
+  await prisma.personalInfo.create({
+    data: {
+      userId: demoApplicant.id,
+      fullName: 'Rajendra Mehta',
+      dob: '1985-06-15',
+      aadharEncrypted: encryptField('234567891234'),
+      panEncrypted: encryptField('ABCDE1234F'),
+      address: '42, Industrial Estate, Hadapsar, Pune 411028',
+      contactEmail: 'rajendra@shreeindustries.com',
+      contactPhone: '9876543210',
+      alternateContact: '020-26871234',
+    },
+  })
+  console.log('✅ Created demo applicant personal info')
+
+  await prisma.businessInfo.create({
+    data: {
+      userId: demoApplicant.id,
+      businessName: 'Shree Industries Pvt. Ltd.',
+      businessType: 'pvt_ltd',
+      gstin: '27ABCDE1234F1Z5',
+      udyamRegistrationNumber: 'UDYAM-MH-27-0012345',
+      incorporationDate: '2018-03-20',
+    },
+  })
+  console.log('✅ Created demo applicant business info')
+
+  // ─── Sample Documents (Document Vault) ─────────
+  const now = new Date()
+  const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000) // Expiring soon
+  const expired30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) // Already expired
+  const in2Years = new Date(now.getTime() + 730 * 24 * 60 * 60 * 1000) // Valid for 2 years
+
+  await prisma.document.createMany({
+    data: [
+      {
+        userId: demoApplicant.id,
+        documentType: 'pan',
+        fileUrl: '/uploads/demo/pan_card_demo.pdf',
+        fileName: 'PAN_Card_ABCDE1234F.pdf',
+        expiryDate: null, // PAN doesn't expire
+      },
+      {
+        userId: demoApplicant.id,
+        documentType: 'gstin_certificate',
+        fileUrl: '/uploads/demo/gstin_cert_demo.pdf',
+        fileName: 'GSTIN_Certificate.pdf',
+        expiryDate: in15Days, // Expiring soon — triggers alert!
+      },
+      {
+        userId: demoApplicant.id,
+        documentType: 'pollution_control_cert',
+        fileUrl: '/uploads/demo/pollution_cert_demo.pdf',
+        fileName: 'MPCB_Consent_Certificate.pdf',
+        expiryDate: expired30DaysAgo, // Already expired — triggers alert!
+      },
+      {
+        userId: demoApplicant.id,
+        documentType: 'land_ownership_proof',
+        fileUrl: '/uploads/demo/land_deed_demo.pdf',
+        fileName: 'Land_Ownership_Deed.pdf',
+        expiryDate: in2Years, // Valid
+      },
+    ],
+  })
+  console.log('✅ Created 4 sample documents in vault')
 
   console.log('\n🎉 Seed completed successfully!')
   console.log('\n📋 Demo Accounts:')

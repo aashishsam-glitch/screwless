@@ -175,6 +175,13 @@ DATABASE_URL="postgresql://user:password@localhost:5432/screwless"
 ```
 Then run `npx prisma migrate dev`.
 
+## Statutory Compliance & Identity Data Protection (Aadhaar & DPDP Act)
+
+In accordance with Indian regulatory frameworks:
+- **Aadhaar Act, 2016 & Regulations**: Storage and display of raw Aadhaar numbers is restricted. In this implementation, Aadhar and PAN identifiers are masked by default across all UI views (`XXXX XXXX 1234`, `XXXXXX1234`).
+- **Cryptographic Protection at Rest**: All Aadhar and PAN numbers are encrypted using symmetric **AES-256-GCM** before persistence to the database. Plaintext values are never logged to server consoles, telemetry, or error messages.
+- **DPDP Act (Digital Personal Data Protection Act, 2023) & UIDAI Guidelines**: A production deployment of this government platform would interface with UIDAI-authorized Authentication User Agencies (AUA/KUA) or utilize DigiLocker / Aadhaar Paperless Offline e-KYC XML/QR mechanisms rather than direct identifier storage.
+
 ## Out of Scope (V2)
 - AI/ML-based document verification
 - Real SMS/email OTP

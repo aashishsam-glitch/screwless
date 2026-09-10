@@ -108,6 +108,16 @@ export default function OfficerQueueRow({ application, onAction }: OfficerQueueR
           <span className="text-xs text-gray-400">Submitted: {submittedDate}</span>
         </div>
 
+        {/* Detailed Review link */}
+        <div className="mb-3">
+          <a
+            href={`/officer/application/${application.id}`}
+            className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg flex items-center justify-center gap-1 transition-colors border border-blue-200"
+          >
+            <span>🔍 Review Attached Documents & Verify</span> →
+          </a>
+        </div>
+
         {/* Action buttons */}
         <div className="flex gap-2">
           <button

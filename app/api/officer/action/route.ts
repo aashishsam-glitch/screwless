@@ -53,6 +53,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Phase 9 Enforcement: Check mandatory document readiness before allowing approval
+    if (action === 'approve') {
+      const mandatoryReqs = await prisma.approvalTypeDocumentRequirement.findMany({
+        where: {
+          approvalTypeId: application.approvalTypeId,
+          isMandatory: true,
+        },
+      })
+
+      const appDocs = await prisma.applicationDocument.findMany({
+        where: { applicationId },
+      })
+
+      for (const req of mandatoryReqs) {
+        const matchingDoc = appDocs.find((d) => d.documentType === req.documentType)
+        if (!matchingDoc || matchingDoc.status === 'missing') {
+          return NextResponse.json(
+            {
+              error: `Cannot approve: Mandatory document "${req.documentType}" has not been attached by applicant.`,
+            },
+            { status: 400 }
+          )
+        }
+        if (matchingDoc.status === 'rejected') {
+          return NextResponse.json(
+            {
+              error: `Cannot approve: Mandatory document "${req.documentType}" has been rejected. It must be re-submitted and verified.`,
+            },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
     // Update application status
     const updated = await prisma.application.update({
       where: { id: applicationId },

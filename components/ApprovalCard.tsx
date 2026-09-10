@@ -70,10 +70,14 @@ export default function ApprovalCard({ approval, isDependencyMet, onSubmit }: Ap
         {/* Header row */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-gray-900 truncate">
+            <a
+              href={`/dashboard/application/${application?.id || approvalType.id}`}
+              className="text-base font-semibold text-gray-900 hover:text-blue-600 truncate block transition-colors"
+              title="Click to view details, flowchart and document readiness"
+            >
               {isLocked && <span className="mr-1">🔒</span>}
-              {approvalType.name}
-            </h3>
+              {approvalType.name} ↗
+            </a>
             <p className="text-sm text-gray-500 mt-0.5">
               {DEPARTMENT_LABELS[approvalType.department] || approvalType.department}
             </p>

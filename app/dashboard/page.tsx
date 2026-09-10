@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import ApprovalCard from '@/components/ApprovalCard'
 import SchemeCard from '@/components/SchemeCard'
 import LoadingSpinner from '@/components/LoadingSpinner'
+import DocumentAlertWidget from '@/components/DocumentAlertWidget'
 
 interface ApprovalData {
   approvalType: {
@@ -207,6 +208,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Expiry alerts widget */}
+      <DocumentAlertWidget />
+
       {/* Header with progress */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Approval Dashboard</h1>

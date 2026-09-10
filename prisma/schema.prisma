@@ -63,8 +63,12 @@ model User {
   officerDepartment String?  @map("officer_department")
   createdAt         DateTime @default(now()) @map("created_at")
 
-  profile      ApplicantProfile?
-  applications Application[]
+  profile          ApplicantProfile?
+  applications     Application[]
+  personalInfo     PersonalInfo?
+  businessInfo     BusinessInfo?
+  documents        Document[]
+  documentComments DocumentComment[]
 
   @@map("users")
 }
@@ -96,6 +100,7 @@ model ApprovalType {
   dependedBy  ApprovalType[] @relation("ApprovalDependency")
   rules       ApprovalRule[]
   applications Application[]
+  documentRequirements ApprovalTypeDocumentRequirement[]
 
   @@map("approval_types")
 }
@@ -124,8 +129,9 @@ model Application {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
-  applicant    User         @relation(fields: [applicantId], references: [id])
-  approvalType ApprovalType @relation(fields: [approvalTypeId], references: [id])
+  applicant            User                  @relation(fields: [applicantId], references: [id])
+  approvalType         ApprovalType          @relation(fields: [approvalTypeId], references: [id])
+  applicationDocuments ApplicationDocument[]
 
   @@map("applications")
 }
@@ -141,4 +147,129 @@ model Scheme {
   sourceUrl         String  @map("source_url")
 
   @@map("schemes")
+}
+
+// ─── New Enums (Upgrade) ─────────────────────────
+
+enum BusinessType {
+  proprietorship
+  partnership
+  pvt_ltd
+  llp
+  other
+}
+
+enum DocumentType {
+  aadhar
+  pan
+  gstin_certificate
+  factory_layout_plan
+  land_ownership_proof
+  electricity_bill
+  building_plan_copy
+  fire_safety_layout
+  pollution_control_cert
+  water_usage_plan
+  labour_license_copy
+  noc_previous
+  incorporation_cert
+  udyam_certificate
+  other
+}
+
+enum DocStatus {
+  missing
+  attached
+  verified
+  rejected
+}
+
+// ─── New Models (Upgrade) ─────────────────────────
+
+model PersonalInfo {
+  id             String   @id @default(cuid())
+  userId         String   @unique @map("user_id")
+  fullName       String   @map("full_name")
+  dob            String?  // stored as ISO date string
+  aadharEncrypted String? @map("aadhar_encrypted") // AES-256-GCM encrypted — see lib/crypto.ts
+  panEncrypted    String? @map("pan_encrypted")     // AES-256-GCM encrypted — see lib/crypto.ts
+  address        String?
+  contactEmail   String?  @map("contact_email")
+  contactPhone   String?  @map("contact_phone")
+  alternateContact String? @map("alternate_contact")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("personal_info")
+}
+
+model BusinessInfo {
+  id                     String       @id @default(cuid())
+  userId                 String       @unique @map("user_id")
+  businessName           String       @map("business_name")
+  businessType           BusinessType @map("business_type")
+  gstin                  String?
+  udyamRegistrationNumber String?     @map("udyam_registration_number")
+  incorporationDate      String?      @map("incorporation_date") // ISO date string
+  createdAt              DateTime     @default(now()) @map("created_at")
+  updatedAt              DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("business_info")
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  userId       String       @map("user_id")
+  documentType DocumentType @map("document_type")
+  fileUrl      String       @map("file_url")
+  fileName     String       @map("file_name")
+  uploadedAt   DateTime     @default(now()) @map("uploaded_at")
+  expiryDate   DateTime?    @map("expiry_date")
+
+  user                 User                  @relation(fields: [userId], references: [id])
+  applicationDocuments ApplicationDocument[]
+
+  @@map("documents")
+}
+
+model ApprovalTypeDocumentRequirement {
+  id             String       @id @default(cuid())
+  approvalTypeId String       @map("approval_type_id")
+  documentType   DocumentType @map("document_type")
+  isMandatory    Boolean      @default(true) @map("is_mandatory")
+
+  approvalType ApprovalType @relation(fields: [approvalTypeId], references: [id])
+
+  @@map("approval_type_document_requirements")
+}
+
+model ApplicationDocument {
+  id            String       @id @default(cuid())
+  applicationId String       @map("application_id")
+  documentId    String?      @map("document_id") // null = required but not yet uploaded
+  documentType  DocumentType @map("document_type")
+  status        DocStatus    @default(missing)
+
+  application Application      @relation(fields: [applicationId], references: [id])
+  document    Document?         @relation(fields: [documentId], references: [id])
+  comments    DocumentComment[]
+
+  @@map("application_documents")
+}
+
+model DocumentComment {
+  id                    String   @id @default(cuid())
+  applicationDocumentId String   @map("application_document_id")
+  officerId             String   @map("officer_id")
+  commentText           String   @map("comment_text")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  applicationDocument ApplicationDocument @relation(fields: [applicationDocumentId], references: [id])
+  officer             User                @relation(fields: [officerId], references: [id])
+
+  @@map("document_comments")
 }
