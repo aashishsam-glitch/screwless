@@ -9,6 +9,7 @@ interface Application {
   status: string
   riskCategory: string
   createdAt: string
+  slaDueDate?: string | null
   approvalType: {
     id: string
     name: string
@@ -103,10 +104,38 @@ export default function OfficerQueueRow({ application, onAction }: OfficerQueueR
         )}
 
         {/* Status + date */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2">
           <StatusBadge status={status} />
           <span className="text-xs text-gray-400">Submitted: {submittedDate}</span>
         </div>
+
+        {/* SLA Countdown */}
+        {application.slaDueDate && status !== 'approved' && status !== 'rejected' && (
+          (() => {
+            const diffDays = Math.ceil(
+              (new Date(application.slaDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            )
+            const isOverdue = diffDays < 0
+            return (
+              <div
+                className={`mb-3 p-2 rounded text-xs flex items-center justify-between border ${
+                  isOverdue
+                    ? 'bg-red-50 text-red-700 border-red-200 font-semibold animate-pulse'
+                    : diffDays <= 5
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-blue-50 text-blue-800 border-blue-200'
+                }`}
+              >
+                <span>⏱️ Citizen's Charter SLA:</span>
+                <span>
+                  {isOverdue
+                    ? `⚠️ Overdue by ${Math.abs(diffDays)} days (Breach)`
+                    : `${diffDays} days remaining`}
+                </span>
+              </div>
+            )
+          })()
+        )}
 
         {/* Detailed Review link */}
         <div className="mb-3">

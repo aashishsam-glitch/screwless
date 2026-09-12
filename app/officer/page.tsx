@@ -15,6 +15,7 @@ interface QueueApplication {
   status: string
   riskCategory: string
   createdAt: string
+  slaDueDate?: string | null
   approvalType: {
     id: string
     name: string

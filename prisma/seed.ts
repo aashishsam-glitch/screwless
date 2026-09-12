@@ -8,6 +8,9 @@ async function main() {
   console.log('🌱 Seeding database...')
 
   // Clear existing data
+  await prisma.grievance.deleteMany()
+  await prisma.inspectionOfficer.deleteMany()
+  await prisma.inspection.deleteMany()
   await prisma.documentComment.deleteMany()
   await prisma.applicationDocument.deleteMany()
   await prisma.approvalTypeDocumentRequirement.deleteMany()
@@ -469,6 +472,63 @@ async function main() {
     ],
   })
   console.log('✅ Created 4 sample documents in vault')
+
+  // ─── Sample Application with SLA, CIS & Grievance ──────
+  const buildingPlanApp = await prisma.application.create({
+    data: {
+      applicantId: demoApplicant.id,
+      approvalTypeId: buildingPlan.id,
+      status: 'submitted',
+      riskCategory: 'orange',
+      assignedOfficerDept: 'municipal_corp',
+      slaDays: 30,
+      slaDueDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000), // 12 days remaining
+    },
+  })
+
+  // Factory license application in info_requested state with an impending SLA deadline
+  const factoryLicenseApp = await prisma.application.create({
+    data: {
+      applicantId: demoApplicant.id,
+      approvalTypeId: factoryLicense.id,
+      status: 'info_requested',
+      riskCategory: 'orange',
+      assignedOfficerDept: 'dish',
+      slaDays: 21,
+      slaDueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // Overdue by 2 days (SLA breached)
+    },
+  })
+
+  // Coordinated Joint Inspection (CIS) involving multiple departments
+  const sampleInspection = await prisma.inspection.create({
+    data: {
+      applicationId: buildingPlanApp.id,
+      scheduledDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // In 3 days
+      status: 'scheduled',
+      findings: 'Combined inspection for structural safety, environmental compliance and fire exits.',
+      officers: {
+        create: [
+          { officerId: officers[0].id, department: 'fire_dept' },
+          { officerId: officers[1].id, department: 'mpcb' },
+          { officerId: officers[2].id, department: 'dish' },
+        ],
+      },
+    },
+  })
+  console.log('✅ Created coordinated joint inspection (CIS) with 3 departments')
+
+  // Sample Grievance filed against delayed application
+  await prisma.grievance.create({
+    data: {
+      applicationId: factoryLicenseApp.id,
+      applicantId: demoApplicant.id,
+      tier: 'tier_1_district',
+      subject: 'Statutory SLA Breached for Factory License Scrutiny',
+      description: 'The prescribed 21-day timeline under RTSA has lapsed. Requesting immediate intervention and deemed approval as per EoDB guidelines.',
+      status: 'pending',
+    },
+  })
+  console.log('✅ Created sample grievance with Tier-1 District escalation')
 
   console.log('\n🎉 Seed completed successfully!')
   console.log('\n📋 Demo Accounts:')

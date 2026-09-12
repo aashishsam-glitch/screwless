@@ -68,7 +68,69 @@ export default function Navbar() {
                     isActive('/vault') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
-                  📁 Document Vault
+                  📁 Vault
+                </a>
+                <a
+                  href="/inspections"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/inspections') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  🔍 Joint Inspections
+                </a>
+                <a
+                  href="/grievances"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/grievances') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  ⚖️ Grievances
+                </a>
+                <a
+                  href="/analytics"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/analytics') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  📊 SLA Analytics
+                </a>
+              </div>
+            )}
+
+            {/* Nav links for officers */}
+            {user && user.role === 'officer' && (
+              <div className="hidden sm:flex items-center gap-1">
+                <a
+                  href="/officer"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/officer') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  Queue
+                </a>
+                <a
+                  href="/officer/inspections"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/officer/inspections') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  🔍 CIS Inspections
+                </a>
+                <a
+                  href="/grievances"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/grievances') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  ⚖️ Grievances
+                </a>
+                <a
+                  href="/analytics"
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    isActive('/analytics') ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  📊 SLA Analytics
                 </a>
               </div>
             )}

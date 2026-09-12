@@ -19,6 +19,7 @@ interface ApprovalCardProps {
       id: string
       status: string
       updatedAt: string
+      slaDueDate?: string | null
     } | null
   }
   isDependencyMet: boolean
@@ -109,6 +110,34 @@ export default function ApprovalCard({ approval, isDependencyMet, onSubmit }: Ap
           <div className="mb-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
             📅 Renewal due: {renewalDate}
           </div>
+        )}
+
+        {/* Statutory SLA Countdown (Citizen's Charter) */}
+        {application?.slaDueDate && status !== 'approved' && status !== 'rejected' && status !== 'not_started' && (
+          (() => {
+            const diffDays = Math.ceil(
+              (new Date(application.slaDueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            )
+            const isOverdue = diffDays < 0
+            return (
+              <div
+                className={`mb-3 p-2 rounded text-xs flex items-center justify-between border ${
+                  isOverdue
+                    ? 'bg-red-50 text-red-700 border-red-200 font-semibold'
+                    : diffDays <= 5
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                }`}
+              >
+                <span>⏱️ RTSA Statutory SLA:</span>
+                <span>
+                  {isOverdue
+                    ? `⚠️ Overdue by ${Math.abs(diffDays)} days`
+                    : `${diffDays} days remaining`}
+                </span>
+              </div>
+            )
+          })()
         )}
 
         {/* Action button */}
