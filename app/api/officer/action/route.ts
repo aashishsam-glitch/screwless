@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ApplicationStatus } from '@prisma/client'
+import { getDocumentStatus } from '@/lib/documents'
 
 const ACTION_STATUS_MAP: Record<string, ApplicationStatus> = {
   approve: 'approved',
@@ -39,51 +40,64 @@ export async function POST(request: NextRequest) {
     // Verify the application belongs to this officer's department
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
-      include: { approvalType: true },
+      include: {
+        approvalType: {
+          include: {
+            documentRequirements: true,
+          },
+        },
+      },
     })
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    if (application.assignedOfficerDept !== user.officerDepartment) {
+    const assignedDept = application.assignedOfficerDept || application.approvalType.department
+    if (user.officerDepartment !== assignedDept) {
       return NextResponse.json(
-        { error: 'This application is not assigned to your department' },
+        { error: 'Forbidden: This application is not assigned to your department' },
         { status: 403 }
       )
     }
 
-    // Phase 9 Enforcement: Check mandatory document readiness before allowing approval
+    // Enforcement: Check mandatory document readiness and verification before allowing approval
     if (action === 'approve') {
-      const mandatoryReqs = await prisma.approvalTypeDocumentRequirement.findMany({
-        where: {
-          approvalTypeId: application.approvalTypeId,
-          isMandatory: true,
-        },
-      })
+      const mandatoryReqs = application.approvalType.documentRequirements.filter((r) => r.isMandatory)
 
       const appDocs = await prisma.applicationDocument.findMany({
         where: { applicationId },
+        include: { document: true },
       })
+
+      const unverifiedList: string[] = []
 
       for (const req of mandatoryReqs) {
         const matchingDoc = appDocs.find((d) => d.documentType === req.documentType)
+
         if (!matchingDoc || matchingDoc.status === 'missing') {
-          return NextResponse.json(
-            {
-              error: `Cannot approve: Mandatory document "${req.documentType}" has not been attached by applicant.`,
-            },
-            { status: 400 }
-          )
+          unverifiedList.push(`${req.documentType} (missing)`)
+        } else if (matchingDoc.status === 'rejected') {
+          unverifiedList.push(`${req.documentType} (rejected)`)
+        } else if (matchingDoc.status !== 'verified') {
+          unverifiedList.push(`${req.documentType} (pending verification)`)
+        } else if (matchingDoc.document?.expiryDate) {
+          const statusInfo = getDocumentStatus(matchingDoc.document.expiryDate)
+          if (statusInfo.status === 'expired') {
+            unverifiedList.push(`${req.documentType} (expired)`)
+          }
         }
-        if (matchingDoc.status === 'rejected') {
-          return NextResponse.json(
-            {
-              error: `Cannot approve: Mandatory document "${req.documentType}" has been rejected. It must be re-submitted and verified.`,
-            },
-            { status: 400 }
-          )
-        }
+      }
+
+      if (unverifiedList.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Application cannot be approved until all mandatory documents are verified.',
+            detail: `Unverified mandatory documents: ${unverifiedList.join(', ')}`,
+            unverifiedDocuments: unverifiedList,
+          },
+          { status: 422 }
+        )
       }
     }
 
@@ -97,7 +111,9 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log(`\n📝 Officer ${user.name} ${action}d application ${applicationId} (${updated.approvalType.name} for ${updated.applicant.name})\n`)
+    console.log(
+      `\n📝 Officer ${user.name} ${action}d application ${applicationId} (${updated.approvalType.name} for ${updated.applicant.name})\n`
+    )
 
     return NextResponse.json({ application: updated })
   } catch (error) {

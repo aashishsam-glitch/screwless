@@ -16,6 +16,7 @@ export default function ApplicationDetailPage({
   const router = useRouter()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   const fetchDetail = async () => {
@@ -41,6 +42,31 @@ export default function ApplicationDetailPage({
     fetchDetail()
   }, [resolvedParams.id])
 
+  const handleApply = async () => {
+    if (!data?.application?.approvalType?.id) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvalTypeId: data.application.approvalType.id }),
+      })
+      const resData = await res.json()
+      if (!res.ok) {
+        const missing = resData.missingDocuments?.length
+          ? `\nMissing Documents: ${resData.missingDocuments.join(', ')}`
+          : ''
+        alert((resData.error || 'Failed to submit application') + missing)
+        return
+      }
+      await fetchDetail()
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit application')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
@@ -65,6 +91,8 @@ export default function ApplicationDetailPage({
 
   const { application, readiness } = data
   const { approvalType } = application
+  const isNotStarted = application.status === 'not_started'
+  const isReadyToApply = readiness.summary ? readiness.summary.isReadyToApply : (readiness.need?.length === 0)
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -86,6 +114,25 @@ export default function ApplicationDetailPage({
             <p className="text-sm text-gray-500 mt-1">Department: {approvalType.department.toUpperCase()}</p>
             <p className="text-sm text-gray-600 mt-3 leading-relaxed">{approvalType.description}</p>
           </div>
+          {isNotStarted && (
+            <div className="sm:text-right shrink-0 space-y-2">
+              <button
+                onClick={handleApply}
+                disabled={submitting || !isReadyToApply}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                  !isReadyToApply
+                    ? 'bg-amber-50 text-amber-800 border border-amber-300 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                }`}
+              >
+                {submitting
+                  ? 'Applying...'
+                  : !isReadyToApply
+                  ? 'Complete required documents to apply'
+                  : 'Apply for Approval →'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -105,7 +152,7 @@ export default function ApplicationDetailPage({
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
             <p className="font-semibold text-gray-900 mb-1">Step 1: Document Prep</p>
             <p className="text-gray-600 leading-relaxed">
-              Verify that all mandatory documents below are in your vault and click "Attach".
+              Ensure all mandatory required documents are uploaded in your vault.
             </p>
           </div>
           <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">

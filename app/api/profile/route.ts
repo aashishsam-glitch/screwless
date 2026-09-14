@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isValidSector, isValidScale, isValidRiskCategory, isValidStage } from '@/lib/validation'
 
 export async function GET() {
   try {
@@ -53,6 +54,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // BUG 17: Validate enum fields on server
+    if (!isValidSector(sector)) {
+      return NextResponse.json({ error: `Invalid sector: "${sector}"` }, { status: 400 })
+    }
+    if (!isValidScale(scale)) {
+      return NextResponse.json({ error: `Invalid scale: "${scale}"` }, { status: 400 })
+    }
+    if (!isValidRiskCategory(riskCategory)) {
+      return NextResponse.json({ error: `Invalid riskCategory: "${riskCategory}"` }, { status: 400 })
+    }
+    if (!isValidStage(stage)) {
+      return NextResponse.json({ error: `Invalid stage: "${stage}"` }, { status: 400 })
+    }
+
     const profile = await prisma.applicantProfile.create({
       data: {
         userId: user.id,
@@ -65,7 +80,6 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Also update user name if provided
     if (body.name && !user.name) {
       await prisma.user.update({
         where: { id: user.id },

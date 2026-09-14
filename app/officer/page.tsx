@@ -87,6 +87,10 @@ export default function OfficerDashboardPage() {
           return
         }
         const authData = await authRes.json()
+        try {
+          localStorage.setItem('screwless_user', JSON.stringify(authData.user))
+          window.dispatchEvent(new CustomEvent('auth-change', { detail: authData.user }))
+        } catch {}
         if (authData.user.role !== 'officer') {
           router.push('/dashboard')
           return
@@ -127,7 +131,11 @@ export default function OfficerDashboardPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error || 'Action failed')
+        alert(
+          data.error
+            ? `${data.error}${data.detail ? `\n\n${data.detail}` : ''}`
+            : 'Action failed'
+        )
         return
       }
 

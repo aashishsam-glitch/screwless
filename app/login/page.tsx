@@ -57,6 +57,12 @@ export default function LoginPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Verification failed')
 
+      // Save user session for instant Navbar hydration
+      try {
+        localStorage.setItem('screwless_user', JSON.stringify(data.user))
+        window.dispatchEvent(new CustomEvent('auth-change', { detail: data.user }))
+      } catch {}
+
       // Redirect based on role and profile
       if (data.user.role === 'officer') {
         router.push('/officer')

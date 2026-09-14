@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import ProfilePopup from './ProfilePopup'
 
@@ -16,20 +16,72 @@ interface UserInfo {
 export default function Navbar() {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [showPopup, setShowPopup] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.user) setUser(data.user)
-      })
-      .catch(() => {})
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me')
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.user) {
+          setUser(data.user)
+          try {
+            localStorage.setItem('screwless_user', JSON.stringify(data.user))
+          } catch {}
+          return
+        }
+      }
+      setUser(null)
+      try {
+        localStorage.removeItem('screwless_user')
+      } catch {}
+    } catch {
+      // Network error, keep existing user if any
+    }
   }, [])
+
+  // Initial load: check localStorage immediately for instant rendering, then verify with API
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem('screwless_user')
+      if (cached) {
+        setUser(JSON.parse(cached))
+      }
+    } catch {}
+    checkAuth()
+  }, [checkAuth])
+
+  // Re-check whenever route/pathname changes
+  useEffect(() => {
+    checkAuth()
+    setMobileMenuOpen(false)
+  }, [pathname, checkAuth])
+
+  // Listen for login/logout events dispatched from any page
+  useEffect(() => {
+    const handleAuthChange = (event: any) => {
+      if (event?.detail) {
+        setUser(event.detail)
+      } else {
+        checkAuth()
+      }
+    }
+    window.addEventListener('auth-change', handleAuthChange)
+    window.addEventListener('storage', checkAuth)
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange)
+      window.removeEventListener('storage', checkAuth)
+    }
+  }, [checkAuth])
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
+    try {
+      localStorage.removeItem('screwless_user')
+      window.dispatchEvent(new CustomEvent('auth-change', { detail: null }))
+    } catch {}
     setUser(null)
     router.push('/login')
   }
@@ -170,6 +222,15 @@ export default function Navbar() {
                 >
                   Logout
                 </button>
+                {/* Mobile hamburger menu toggle */}
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="sm:hidden p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                  aria-label="Toggle navigation menu"
+                >
+                  <span className="text-xl font-bold">{mobileMenuOpen ? '✕' : '☰'}</span>
+                </button>
               </>
             ) : (
               <a
@@ -181,6 +242,100 @@ export default function Navbar() {
             )}
           </div>
         </div>
+
+        {/* Mobile menu dropdown for small/narrow screens */}
+        {mobileMenuOpen && user && (
+          <div className="sm:hidden border-t border-gray-200 py-3 space-y-1">
+            {user.role === 'applicant' ? (
+              <>
+                <a
+                  href="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/dashboard') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Dashboard
+                </a>
+                <a
+                  href="/vault"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/vault') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  📁 Vault
+                </a>
+                <a
+                  href="/inspections"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/inspections') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  🔍 Joint Inspections
+                </a>
+                <a
+                  href="/grievances"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/grievances') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  ⚖️ Grievances
+                </a>
+                <a
+                  href="/analytics"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/analytics') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  📊 SLA Analytics
+                </a>
+              </>
+            ) : (
+              <>
+                <a
+                  href="/officer"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/officer') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Queue
+                </a>
+                <a
+                  href="/officer/inspections"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/officer/inspections') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  🔍 CIS Inspections
+                </a>
+                <a
+                  href="/grievances"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/grievances') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  ⚖️ Grievances
+                </a>
+                <a
+                  href="/analytics"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-3 py-2 text-base rounded-md font-medium transition-colors ${
+                    isActive('/analytics') ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  📊 SLA Analytics
+                </a>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   )
