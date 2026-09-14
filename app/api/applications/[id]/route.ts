@@ -13,10 +13,20 @@ export async function GET(
 
     const { id } = await context.params
 
-    // Find application by ID or by approvalTypeId for current user
-    let application = await prisma.application.findUnique({
+    // 1. Find existing application by Application.id
+    let application: any = await prisma.application.findUnique({
       where: { id },
       include: {
+        applicant: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            businessInfo: true,
+            personalInfo: true,
+          },
+        },
         approvalType: {
           include: {
             dependsOn: true,
@@ -38,7 +48,7 @@ export async function GET(
       },
     })
 
-    // If not found by application.id, check if id is an approvalTypeId for this user
+    // 2. If not found by application.id, check if id is an approvalTypeId for this user
     if (!application) {
       const approvalType = await prisma.approvalType.findUnique({
         where: { id },
@@ -46,8 +56,8 @@ export async function GET(
       })
 
       if (approvalType) {
-        // Find or create application in not_started state
-        let existingApp = await prisma.application.findFirst({
+        // Search if user has an existing submitted application for this approval type
+        const existingApp = await prisma.application.findFirst({
           where: {
             applicantId: user.id,
             approvalTypeId: approvalType.id,
@@ -68,35 +78,24 @@ export async function GET(
           },
         })
 
-        if (!existingApp) {
-          const profile = await prisma.applicantProfile.findUnique({
-            where: { userId: user.id },
-          })
-          existingApp = await prisma.application.create({
-            data: {
-              applicantId: user.id,
-              approvalTypeId: approvalType.id,
-              status: 'not_started',
-              riskCategory: profile?.riskCategory || 'green',
-              assignedOfficerDept: approvalType.department,
-            },
-            include: {
-              approvalType: { include: { dependsOn: true } },
-              applicationDocuments: {
-                include: {
-                  document: true,
-                  comments: {
-                    include: {
-                      officer: { select: { name: true, officerDepartment: true } },
-                    },
-                    orderBy: { createdAt: 'desc' },
-                  },
-                },
-              },
-            },
-          })
+        if (existingApp) {
+          application = existingApp
+        } else {
+          // Pre-application view: Do NOT auto-create application in database
+          const readiness = await getDocumentReadiness(approvalType.id, user.id)
+          const unsubmittedApp = {
+            id: approvalType.id,
+            applicantId: user.id,
+            approvalTypeId: approvalType.id,
+            status: 'not_started',
+            assignedOfficerDept: approvalType.department,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            approvalType,
+            applicationDocuments: [],
+          }
+          return NextResponse.json({ application: unsubmittedApp, readiness })
         }
-        application = existingApp
       }
     }
 
@@ -109,7 +108,7 @@ export async function GET(
     }
 
     // Get document readiness
-    const readiness = await getDocumentReadiness(application.approvalTypeId, application.applicantId)
+    const readiness = await getDocumentReadiness(application.approvalTypeId, application.applicantId, application.id)
 
     return NextResponse.json({ application, readiness })
   } catch (error) {

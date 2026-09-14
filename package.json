@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test:otp": "ts-node --compiler-options \"{\\\"module\\\":\\\"CommonJS\\\"}\" scratch/test_otp_scenarios.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {

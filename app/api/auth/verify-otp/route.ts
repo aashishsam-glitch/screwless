@@ -13,39 +13,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const isValid = verifyOTP(identifier.trim(), code.trim())
-    if (!isValid) {
+    const verification = verifyOTP(identifier, code)
+    if (!verification.valid) {
       return NextResponse.json(
-        { error: 'Invalid or expired OTP' },
+        { error: verification.error || 'Invalid or expired OTP' },
         { status: 401 }
       )
     }
 
-    // Determine if identifier is email or phone
-    const isEmail = identifier.includes('@')
+    const cleanId = identifier.trim()
+    const isEmail = cleanId.includes('@')
     const whereClause = isEmail
-      ? { email: identifier.trim() }
-      : { phone: identifier.trim() }
+      ? { email: cleanId.toLowerCase() }
+      : { phone: cleanId }
 
-    // Find or create user
     let user = await prisma.user.findFirst({ where: whereClause })
 
     if (!user) {
       user = await prisma.user.create({
         data: {
           ...whereClause,
-          name: name || null,
-          role: 'applicant', // Default role for new signups
+          name: name ? name.trim() : null,
+          role: 'applicant',
         },
       })
     }
 
-    // Check if user has a profile
     const profile = await prisma.applicantProfile.findUnique({
       where: { userId: user.id },
     })
 
-    // Create session
     await createSession(user.id, user.role)
 
     return NextResponse.json({

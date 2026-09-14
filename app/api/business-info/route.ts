@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isValidBusinessType } from '@/lib/validation'
 
 export async function GET() {
   try {
@@ -25,6 +26,10 @@ export async function POST(request: NextRequest) {
 
     if (!businessName || !businessType) {
       return NextResponse.json({ error: 'Business name and type are required' }, { status: 400 })
+    }
+
+    if (!isValidBusinessType(businessType)) {
+      return NextResponse.json({ error: `Invalid businessType: "${businessType}"` }, { status: 400 })
     }
 
     // Validate GSTIN format if provided (15 chars)

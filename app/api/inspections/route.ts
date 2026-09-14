@@ -10,7 +10,6 @@ export async function GET() {
     let inspections
 
     if (user.role === 'officer') {
-      // Officer sees inspections where their department or user is assigned
       inspections = await prisma.inspection.findMany({
         where: {
           officers: {
@@ -28,14 +27,13 @@ export async function GET() {
           },
           officers: {
             include: {
-              officer: { select: { name: true, email: true } },
+              officer: { select: { name: true, email: true, officerDepartment: true } },
             },
           },
         },
         orderBy: { scheduledDate: 'asc' },
       })
     } else {
-      // Applicant sees inspections for their applications
       inspections = await prisma.inspection.findMany({
         where: {
           application: {
@@ -75,20 +73,68 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { applicationId, scheduledDate, departments, findings } = body
 
-    if (!applicationId || !scheduledDate || !departments || departments.length === 0) {
+    if (!applicationId || !scheduledDate || !departments || !Array.isArray(departments) || departments.length === 0) {
       return NextResponse.json(
         { error: 'applicationId, scheduledDate, and at least one department are required' },
         { status: 400 }
       )
     }
 
-    // Find officer accounts corresponding to the requested departments
+    // BUG 14: Validate application existence and workflow status
+    const application = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { approvalType: true },
+    })
+
+    if (!application) {
+      return NextResponse.json({ error: 'Application not found' }, { status: 404 })
+    }
+
+    if (application.status === 'approved' || application.status === 'rejected') {
+      return NextResponse.json(
+        { error: `Cannot schedule inspection for an application that is already ${application.status}` },
+        { status: 400 }
+      )
+    }
+
+    // BUG 16: Check for existing active/scheduled inspection for this application
+    const existingActiveInspection = await prisma.inspection.findFirst({
+      where: {
+        applicationId,
+        status: { in: ['scheduled', 'in_progress'] },
+      },
+    })
+
+    if (existingActiveInspection) {
+      return NextResponse.json(
+        {
+          error: 'Duplicate inspection prevented: An active inspection is already scheduled for this application.',
+          inspectionId: existingActiveInspection.id,
+        },
+        { status: 409 }
+      )
+    }
+
+    // BUG 15: Validate that an officer exists for EVERY requested department
     const assignedOfficers = await prisma.user.findMany({
       where: {
         role: 'officer',
         officerDepartment: { in: departments },
       },
     })
+
+    const foundDepartments = new Set(assignedOfficers.map((o) => o.officerDepartment))
+    const missingDepartments = departments.filter((dept: string) => !foundDepartments.has(dept))
+
+    if (missingDepartments.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Cannot create joint inspection: No active officer found for department(s): ${missingDepartments.join(', ')}`,
+          missingDepartments,
+        },
+        { status: 400 }
+      )
+    }
 
     const inspection = await prisma.inspection.create({
       data: {

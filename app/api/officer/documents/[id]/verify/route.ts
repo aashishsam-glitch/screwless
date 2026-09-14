@@ -9,7 +9,7 @@ export async function POST(
   try {
     const user = await getCurrentUser()
     if (!user || user.role !== 'officer') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      return NextResponse.json({ error: 'Unauthorized. Officers only.' }, { status: 403 })
     }
 
     const { id: applicationDocumentId } = await context.params
@@ -19,6 +19,28 @@ export async function POST(
       return NextResponse.json(
         { error: 'Status must be verified or rejected' },
         { status: 400 }
+      )
+    }
+
+    const appDoc = await prisma.applicationDocument.findUnique({
+      where: { id: applicationDocumentId },
+      include: {
+        application: {
+          include: { approvalType: true },
+        },
+      },
+    })
+
+    if (!appDoc) {
+      return NextResponse.json({ error: 'Document record not found' }, { status: 404 })
+    }
+
+    // Verify officer department matches application assigned officer department
+    const assignedDept = appDoc.application.assignedOfficerDept || appDoc.application.approvalType.department
+    if (!user.officerDepartment || user.officerDepartment !== assignedDept) {
+      return NextResponse.json(
+        { error: 'Forbidden: Document belongs to another department' },
+        { status: 403 }
       )
     }
 

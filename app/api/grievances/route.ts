@@ -10,8 +10,20 @@ export async function GET() {
     let grievances
 
     if (user.role === 'officer') {
-      // Officers see grievances across the state/department
+      // Officers see grievances for their department or state-level tier_2 grievances
       grievances = await prisma.grievance.findMany({
+        where: {
+          OR: [
+            {
+              application: {
+                assignedOfficerDept: user.officerDepartment || undefined,
+              },
+            },
+            {
+              tier: 'tier_2_state',
+            },
+          ],
+        },
         include: {
           application: {
             include: {
@@ -50,9 +62,9 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     const body = await request.json()
-    const { applicationId, subject, description, tier } = body
+    const { applicationId, subject, description, requestedTier } = body
 
-    if (!applicationId || !subject || !description) {
+    if (!applicationId || !subject || !description || !subject.trim() || !description.trim()) {
       return NextResponse.json(
         { error: 'applicationId, subject, and description are required' },
         { status: 400 }
@@ -68,13 +80,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Application not found or unauthorized' }, { status: 404 })
     }
 
+    // Server-enforced tier calculation:
+    // Check if a Tier 1 grievance already exists for this application
+    const existingTier1 = await prisma.grievance.findFirst({
+      where: {
+        applicationId,
+        tier: 'tier_1_district',
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    let assignedTier: 'tier_1_district' | 'tier_2_state' = 'tier_1_district'
+
+    if (requestedTier === 'tier_2_state') {
+      // Client explicitly requested escalation to Tier 2
+      if (!existingTier1) {
+        return NextResponse.json(
+          {
+            error:
+              'Invalid escalation: A Tier 1 District grievance must be submitted first before escalating to Tier 2 State.',
+          },
+          { status: 422 }
+        )
+      }
+      if (existingTier1.status === 'pending' || existingTier1.status === 'under_review') {
+        // Allow escalation only if Tier 1 has been pending for over 7 days or is explicitly unresolved/rejected
+        const daysPending = (Date.now() - existingTier1.createdAt.getTime()) / (1000 * 60 * 60 * 24)
+        if (daysPending < 7) {
+          return NextResponse.json(
+            {
+              error:
+                'Tier 1 District grievance is currently active. Escalation to Tier 2 is allowed only after 7 days without resolution or upon rejection.',
+            },
+            { status: 422 }
+          )
+        }
+      }
+      assignedTier = 'tier_2_state'
+    }
+
     const grievance = await prisma.grievance.create({
       data: {
         applicationId,
         applicantId: user.id,
-        subject,
-        description,
-        tier: tier || 'tier_1_district',
+        subject: subject.trim(),
+        description: description.trim(),
+        tier: assignedTier,
         status: 'pending',
       },
       include: {

@@ -73,23 +73,60 @@ export default function OfficerDocumentReview({
     }
   }
 
-  const statusBadge = {
-    missing: <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium">Missing</span>,
-    attached: <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium border border-blue-200">Attached - Needs Review</span>,
-    verified: <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium border border-emerald-200">✓ Verified</span>,
-    rejected: <span className="text-[10px] bg-red-50 text-red-700 px-2 py-0.5 rounded font-medium border border-red-200">✕ Rejected</span>,
-  }[appDoc.status]
+  const isExpired =
+    appDoc.document?.expiryDate && new Date(appDoc.document.expiryDate) < new Date()
+
+  let statusBadge
+  if (!appDoc.document || appDoc.status === 'missing') {
+    statusBadge = (
+      <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200">
+        ⚪ Missing
+      </span>
+    )
+  } else if (isExpired) {
+    statusBadge = (
+      <span className="text-[10px] bg-amber-50 text-amber-800 px-2 py-0.5 rounded font-medium border border-amber-300">
+        🟠 Expired ({new Date(appDoc.document.expiryDate!).toLocaleDateString('en-IN')})
+      </span>
+    )
+  } else if (appDoc.status === 'rejected') {
+    statusBadge = (
+      <span className="text-[10px] bg-red-50 text-red-700 px-2 py-0.5 rounded font-medium border border-red-200">
+        🔴 Rejected
+      </span>
+    )
+  } else if (appDoc.status === 'verified') {
+    statusBadge = (
+      <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-medium border border-emerald-300">
+        🟢 Verified
+      </span>
+    )
+  } else {
+    statusBadge = (
+      <span className="text-[10px] bg-yellow-50 text-yellow-800 px-2 py-0.5 rounded font-medium border border-yellow-300">
+        🟡 Pending Verification
+      </span>
+    )
+  }
+
+  const uploadedDate = (appDoc.document as any)?.uploadedAt
+    ? new Date((appDoc.document as any).uploadedAt).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      })
+    : null
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-2xs space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-sm font-bold text-gray-900">
               {formatDocumentType(appDoc.documentType)}
             </h4>
             {isMandatory ? (
-              <span className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded font-medium border border-red-200">
+              <span className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded font-semibold border border-red-200">
                 Mandatory
               </span>
             ) : (
@@ -100,8 +137,11 @@ export default function OfficerDocumentReview({
             {statusBadge}
           </div>
           {appDoc.document ? (
-            <div className="flex items-center gap-3 mt-1.5">
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <span className="text-xs font-mono text-gray-600">{appDoc.document.fileName}</span>
+              {uploadedDate && (
+                <span className="text-xs text-gray-400">Uploaded: {uploadedDate}</span>
+              )}
               <a
                 href={appDoc.document.fileUrl}
                 target="_blank"
@@ -116,20 +156,20 @@ export default function OfficerDocumentReview({
           )}
         </div>
 
-        {/* Verification Buttons */}
+        {/* Verification Action Buttons */}
         {appDoc.document && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={() => handleVerifyAction('verified')}
-              disabled={loading || appDoc.status === 'verified'}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+              disabled={loading || (appDoc.status === 'verified' && !isExpired)}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
             >
               ✓ Verify
             </button>
             <button
               onClick={() => handleVerifyAction('rejected')}
               disabled={loading || appDoc.status === 'rejected'}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1 shadow-2xs"
             >
               ✕ Reject
             </button>

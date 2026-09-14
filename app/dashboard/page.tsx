@@ -6,6 +6,17 @@ import ApprovalCard from '@/components/ApprovalCard'
 import SchemeCard from '@/components/SchemeCard'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import DocumentAlertWidget from '@/components/DocumentAlertWidget'
+import DocumentUploadModal from '@/components/DocumentUploadModal'
+
+interface RequirementItem {
+  id: string
+  documentType: string
+  formattedName: string
+  isMandatory: boolean
+  isReady: boolean
+  readinessStatus: string
+  reason?: string
+}
 
 interface ApprovalData {
   approvalType: {
@@ -24,6 +35,14 @@ interface ApprovalData {
     status: string
     updatedAt: string
   } | null
+  readiness?: {
+    totalRequired: number
+    readyCount: number
+    readinessPct: number
+    isReadyToApply: boolean
+    missingDocuments: string[]
+    requirements: RequirementItem[]
+  }
 }
 
 interface SchemeData {
@@ -50,6 +69,19 @@ export default function DashboardPage() {
   const [schemes, setSchemes] = useState<SchemeData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [uploadingDocType, setUploadingDocType] = useState<string | null>(null)
+
+  const refreshApprovals = useCallback(async () => {
+    try {
+      const res = await fetch('/api/approvals/matching')
+      if (res.ok) {
+        const data = await res.json()
+        setApprovals(data.approvals)
+      }
+    } catch (err) {
+      console.error('Failed to refresh approvals:', err)
+    }
+  }, [])
 
   // Fetch initial data
   useEffect(() => {
@@ -62,6 +94,10 @@ export default function DashboardPage() {
           return
         }
         const authData = await authRes.json()
+        try {
+          localStorage.setItem('screwless_user', JSON.stringify(authData.user))
+          window.dispatchEvent(new CustomEvent('auth-change', { detail: authData.user }))
+        } catch {}
         if (authData.user.role === 'officer') {
           router.push('/officer')
           return
@@ -96,7 +132,6 @@ export default function DashboardPage() {
   }, [router])
 
   // Poll for status updates every 5 seconds
-  // V2: upgrade to WebSockets for instant updates
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -144,22 +179,18 @@ export default function DashboardPage() {
 
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || 'Failed to submit application')
+        const missing = data.missingDocuments?.length
+          ? `\nMissing Documents: ${data.missingDocuments.join(', ')}`
+          : ''
+        alert((data.error || 'Failed to submit application') + missing)
         return
       }
 
-      // Update local state with the new application
-      setApprovals(prev =>
-        prev.map(approval =>
-          approval.approvalType.id === approvalTypeId
-            ? { ...approval, application: data.application }
-            : approval
-        )
-      )
+      await refreshApprovals()
     } catch (err: any) {
       alert(err.message || 'Failed to submit application')
     }
-  }, [])
+  }, [refreshApprovals])
 
   // Check if a dependency is met (the depended-upon approval is 'approved')
   const isDependencyMet = useCallback(
@@ -263,9 +294,9 @@ export default function DashboardPage() {
                 approval={approval}
                 isDependencyMet={isDependencyMet(approval)}
                 onSubmit={handleSubmitApplication}
+                onUploadClick={(docType) => setUploadingDocType(docType)}
               />
-            ))
-            }
+            ))}
           </div>
         )}
       </section>
@@ -289,6 +320,18 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
+
+      {/* Document Upload Modal */}
+      {uploadingDocType && (
+        <DocumentUploadModal
+          initialType={uploadingDocType}
+          onClose={() => setUploadingDocType(null)}
+          onSuccess={() => {
+            setUploadingDocType(null)
+            refreshApprovals()
+          }}
+        />
+      )}
     </div>
   )
 }

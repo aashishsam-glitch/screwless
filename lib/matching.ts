@@ -1,11 +1,13 @@
 import { prisma } from './prisma'
 import type { ApplicantProfile, ApprovalType, ApprovalRule, Scheme, Application } from '@prisma/client'
+import { computeApprovalReadiness, type ApprovalReadinessSummary } from './documents'
 
 export interface MatchedApproval {
   approvalType: ApprovalType & { dependsOn?: ApprovalType | null }
   isSelfCertifiable: boolean
   dependsOnName: string | null
   application?: Application | null // existing application if any
+  readiness?: ApprovalReadinessSummary
 }
 
 export interface MatchedScheme {
@@ -24,12 +26,13 @@ export async function getMatchingApprovals(
   profile: ApplicantProfile,
   userId: string
 ): Promise<MatchedApproval[]> {
-  // Fetch all rules with their approval types and dependencies
+  // Fetch all rules with their approval types, dependencies, and document requirements
   const rules = await prisma.approvalRule.findMany({
     include: {
       approvalType: {
         include: {
           dependsOn: true,
+          documentRequirements: true,
         },
       },
     },
@@ -38,6 +41,12 @@ export async function getMatchingApprovals(
   // Fetch existing applications for this user
   const existingApplications = await prisma.application.findMany({
     where: { applicantId: userId },
+    include: { applicationDocuments: true },
+  })
+
+  // Fetch all user vault documents
+  const userDocs = await prisma.document.findMany({
+    where: { userId },
   })
 
   // Filter rules that match the profile
@@ -72,12 +81,19 @@ export async function getMatchingApprovals(
       (app) => app.approvalTypeId === rule.approvalTypeId
     )
 
+    const readiness = computeApprovalReadiness(
+      rule.approvalType.documentRequirements,
+      userDocs,
+      application?.applicationDocuments || []
+    )
+
     if (!existing) {
       approvalMap.set(rule.approvalTypeId, {
         approvalType: rule.approvalType,
         isSelfCertifiable: rule.isSelfCertifiable,
         dependsOnName: rule.approvalType.dependsOn?.name ?? null,
         application: application ?? null,
+        readiness,
       })
     } else {
       // If any rule says not self-certifiable, the approval is not self-certifiable

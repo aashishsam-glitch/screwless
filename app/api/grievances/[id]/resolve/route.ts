@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { isValidGrievanceStatus } from '@/lib/validation'
 
 export async function POST(
   request: NextRequest,
@@ -16,15 +17,61 @@ export async function POST(
     const body = await request.json()
     const { status, resolutionRemarks } = body
 
-    if (!['resolved', 'rejected', 'under_review'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    if (!status || !isValidGrievanceStatus(status) || status === 'pending') {
+      return NextResponse.json(
+        { error: 'Valid status required (under_review, resolved, or rejected)' },
+        { status: 400 }
+      )
     }
+
+    const grievance = await prisma.grievance.findUnique({
+      where: { id: grievanceId },
+      include: {
+        application: {
+          include: { approvalType: true },
+        },
+      },
+    })
+
+    if (!grievance) {
+      return NextResponse.json({ error: 'Grievance not found' }, { status: 404 })
+    }
+
+    // Check authorization based on grievance tier
+    if (grievance.tier === 'tier_1_district') {
+      const assignedDept = grievance.application.assignedOfficerDept || grievance.application.approvalType.department
+      if (user.officerDepartment !== assignedDept) {
+        return NextResponse.json(
+          { error: 'Forbidden: You are not authorized to resolve District Tier 1 grievances for this department' },
+          { status: 403 }
+        )
+      }
+    } else if (grievance.tier === 'tier_2_state') {
+      // Tier 2 state grievances require state empowered committee or assigned officer department
+      const isStateAuthorized =
+        user.officerDepartment === 'state_empowered_committee' ||
+        user.officerDepartment === grievance.application.assignedOfficerDept ||
+        user.officerDepartment === 'industry_dept'
+
+      if (!isStateAuthorized) {
+        return NextResponse.json(
+          { error: 'Forbidden: State Tier 2 grievance resolution requires authorized state authority' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Audit log entry in resolution remarks
+    const auditInfo = `[Resolved by Officer ${user.name || user.email} (${user.officerDepartment}) at ${new Date().toISOString()}]`
+    const finalRemarks = resolutionRemarks
+      ? `${resolutionRemarks.trim()} ${auditInfo}`
+      : auditInfo
 
     const updated = await prisma.grievance.update({
       where: { id: grievanceId },
       data: {
         status,
-        resolutionRemarks: resolutionRemarks || null,
+        resolutionRemarks: finalRemarks,
       },
       include: {
         application: { include: { approvalType: true } },
