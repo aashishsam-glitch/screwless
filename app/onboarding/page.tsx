@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import LoadingSpinner from '@/components/LoadingSpinner'
 
@@ -41,8 +41,10 @@ const STAGES = [
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const [pageLoading, setPageLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const [form, setForm] = useState({
     name: '',
@@ -54,6 +56,65 @@ export default function OnboardingPage() {
     stage: '',
   })
 
+  // Load existing profile if available and verify auth (handles TEST 4: refresh page loads saved values)
+  useEffect(() => {
+    let isMounted = true
+
+    const init = async () => {
+      try {
+        setPageLoading(true)
+        // 1. Verify authentication
+        const authRes = await fetch('/api/auth/me')
+        if (!authRes.ok) {
+          router.push('/login')
+          return
+        }
+
+        const authContentType = authRes.headers.get('content-type') || ''
+        if (!authContentType.includes('application/json')) {
+          router.push('/login')
+          return
+        }
+
+        const authData = await authRes.json()
+        if (authData?.user?.role === 'officer') {
+          router.push('/officer')
+          return
+        }
+
+        // 2. Load existing profile data if user already has one
+        const profileRes = await fetch('/api/profile')
+        const profileContentType = profileRes.headers.get('content-type') || ''
+
+        if (profileRes.ok && profileContentType.includes('application/json')) {
+          const profileData = await profileRes.json()
+          if (profileData?.profile && isMounted) {
+            const p = profileData.profile
+            setForm({
+              name: p.name || authData?.user?.name || '',
+              sector: p.sector || '',
+              scale: p.scale || '',
+              locationDistrict: p.locationDistrict || '',
+              inNotifiedIndustrialZone: Boolean(p.inNotifiedIndustrialZone),
+              riskCategory: p.riskCategory || '',
+              stage: p.stage || '',
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load profile initialization data:', err)
+      } finally {
+        if (isMounted) setPageLoading(false)
+      }
+    }
+
+    init()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router])
+
   const updateField = (field: string, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
@@ -64,6 +125,7 @@ export default function OnboardingPage() {
     e.preventDefault()
     if (!isFormComplete) return
     setError('')
+    setSuccess('')
     setLoading(true)
 
     try {
@@ -73,15 +135,61 @@ export default function OnboardingPage() {
         body: JSON.stringify(form),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to save profile')
+      // Robust response handling: verify Content-Type before parsing JSON
+      const contentType = res.headers.get('content-type') || ''
+      let data: any = null
 
-      router.push('/dashboard')
+      if (contentType.includes('application/json')) {
+        try {
+          data = await res.json()
+        } catch (parseErr) {
+          console.error('Failed to parse JSON response from /api/profile:', parseErr)
+          throw new Error('Unable to save your profile. Please try again.')
+        }
+      } else {
+        const rawText = await res.text().catch(() => '')
+        console.error('Non-JSON response received from /api/profile:', res.status, rawText.slice(0, 300))
+        throw new Error('Unable to save your profile. Please try again.')
+      }
+
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error || 'Unable to save your profile. Please check the entered data.')
+      }
+
+      setSuccess('Profile saved successfully! Redirecting...')
+
+      // Sync user session in localStorage & notify Navbar
+      try {
+        if (data?.profile?.name) {
+          const cached = localStorage.getItem('screwless_user')
+          if (cached) {
+            const parsed = JSON.parse(cached)
+            parsed.name = data.profile.name
+            localStorage.setItem('screwless_user', JSON.stringify(parsed))
+            window.dispatchEvent(new CustomEvent('auth-change', { detail: parsed }))
+          }
+        }
+      } catch {}
+
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 500)
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'Unable to save your profile. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (pageLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="text-gray-500 mt-4">Loading your profile...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -95,8 +203,23 @@ export default function OnboardingPage() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-start gap-3 shadow-xs">
+          <span className="text-xl leading-none">⚠️</span>
+          <div className="flex-1 text-sm font-medium">{error}</div>
+          <button
+            type="button"
+            onClick={() => setError('')}
+            className="text-red-400 hover:text-red-700 text-sm font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {success && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 flex items-center gap-3 shadow-xs">
+          <span className="text-xl leading-none">✓</span>
+          <div className="text-sm font-medium">{success}</div>
         </div>
       )}
 
@@ -238,14 +361,21 @@ export default function OnboardingPage() {
         </div>
 
         {/* Submit */}
-        <button
-          type="submit"
-          disabled={loading || !isFormComplete}
-          className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-lg"
-        >
-          {loading ? <LoadingSpinner size="sm" /> : null}
-          {loading ? 'Saving...' : 'Continue to Dashboard →'}
-        </button>
+        <div className="space-y-3">
+          <button
+            type="submit"
+            disabled={loading || !isFormComplete}
+            className="w-full py-3.5 px-4 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-lg shadow-sm hover:shadow-md"
+          >
+            {loading ? <LoadingSpinner size="sm" /> : null}
+            {loading ? 'Saving Profile...' : 'Continue to Dashboard →'}
+          </button>
+          {!isFormComplete && (
+            <p className="text-center text-xs text-gray-500">
+              Please complete all mandatory fields marked with an asterisk (<span className="text-red-500 font-semibold">*</span>) to proceed.
+            </p>
+          )}
+        </div>
       </form>
     </div>
   )

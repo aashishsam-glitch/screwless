@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { encryptField, maskAadhar, maskPan, validateAadhar, validatePan, decryptField } from '@/lib/crypto'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()

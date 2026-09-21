@@ -45,6 +45,19 @@ export default function PersonalInfoPage() {
     incorporationDate: '',
   })
 
+  // Safe JSON parser helper
+  const parseSafeJson = async (res: Response, fallback = 'Unable to process request') => {
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      try {
+        return await res.json()
+      } catch {
+        throw new Error(fallback)
+      }
+    }
+    throw new Error(fallback)
+  }
+
   // Load existing data
   useEffect(() => {
     const loadData = async () => {
@@ -58,8 +71,8 @@ export default function PersonalInfoPage() {
         ])
 
         if (pRes.ok) {
-          const pData = await pRes.json()
-          if (pData.personalInfo) {
+          const pData = await parseSafeJson(pRes).catch(() => null)
+          if (pData?.personalInfo) {
             const p = pData.personalInfo
             setPersonal(prev => ({
               ...prev,
@@ -78,8 +91,8 @@ export default function PersonalInfoPage() {
         }
 
         if (bRes.ok) {
-          const bData = await bRes.json()
-          if (bData.businessInfo) {
+          const bData = await parseSafeJson(bRes).catch(() => null)
+          if (bData?.businessInfo) {
             const b = bData.businessInfo
             setBusiness({
               businessName: b.businessName || '',
@@ -91,7 +104,7 @@ export default function PersonalInfoPage() {
           }
         }
       } catch {
-        setError('Failed to load data')
+        setError('Failed to load profile data. Please try again.')
       } finally {
         setLoading(false)
       }
@@ -104,7 +117,7 @@ export default function PersonalInfoPage() {
     try {
       const res = await fetch('/api/personal-info?reveal=true')
       if (res.ok) {
-        const data = await res.json()
+        const data = await parseSafeJson(res)
         if (field === 'aadhar') {
           setRevealedAadhar(data.personalInfo?.aadhar || null)
           setShowAadhar(true)
@@ -140,9 +153,9 @@ export default function PersonalInfoPage() {
           alternateContact: personal.alternateContact || null,
         }),
       })
+      const pData = await parseSafeJson(pRes, 'Failed to save personal information')
       if (!pRes.ok) {
-        const data = await pRes.json()
-        throw new Error(data.error || 'Failed to save personal info')
+        throw new Error(pData?.error || 'Failed to save personal info')
       }
 
       // Save business info if business name is provided
@@ -152,9 +165,9 @@ export default function PersonalInfoPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(business),
         })
+        const bData = await parseSafeJson(bRes, 'Failed to save business information')
         if (!bRes.ok) {
-          const data = await bRes.json()
-          throw new Error(data.error || 'Failed to save business info')
+          throw new Error(bData?.error || 'Failed to save business info')
         }
       }
 
@@ -164,13 +177,15 @@ export default function PersonalInfoPage() {
       // Reload masked values
       const freshRes = await fetch('/api/personal-info')
       if (freshRes.ok) {
-        const freshData = await freshRes.json()
-        setMaskedAadhar(freshData.personalInfo?.aadhar)
-        setMaskedPan(freshData.personalInfo?.pan)
-        setHasExistingData(true)
+        const freshData = await parseSafeJson(freshRes).catch(() => null)
+        if (freshData?.personalInfo) {
+          setMaskedAadhar(freshData.personalInfo?.aadhar)
+          setMaskedPan(freshData.personalInfo?.pan)
+          setHasExistingData(true)
+        }
       }
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message || 'Failed to save information. Please try again.')
     } finally {
       setSaving(false)
     }

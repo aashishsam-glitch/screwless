@@ -1,192 +1,237 @@
-# Screwless — Industrial Approvals & Compliance Platform
+# Screwless — Industrial Approvals, Compliance & Inspection Platform
 
-> SIH 2026 · Problem Statement SIH26130 — *Efficiency in streamlining industrial approvals, compliance processes, and access to government support services*
+> **SIH 2026 · Problem Statement SIH26130** — *Efficiency in streamlining industrial approvals, compliance processes, and access to government support services*
 
+A full-stack enterprise single-window clearance portal designed for industrial units (MSMEs and large enterprises) in Maharashtra, India. Screwless transforms fragmented regulatory clearances across multiple government departments into a dependency-aware, document-gated business journey with statutory SLA countdowns, coordinated joint inspections, and multi-tier grievance redressal.
 
-A full-stack web application that helps industrial applicants (MSMEs/businesses) in Maharashtra discover which government approvals they need, track their status, and get matched to relevant subsidy schemes — with a live officer-side dashboard for processing applications.
+---
+
+## 👥 Demo Access
+
+The prototype uses OTP-based authentication. Pre-seeded test accounts are available for evaluation; OTPs are provided through the development/demo environment (logged directly to the server terminal console).
+
+* **Local Demo:** `http://localhost:3000`
+* **Live Demo:** [Add actual URL once deployed]
+
+### 🔑 Pre-Seeded Test Accounts
+
+| Role | Name | Email | Department / Scope |
+|------|------|-------|--------------------|
+| **Applicant** | Demo Applicant | `applicant@demo.com` | Manufacturing MSME (Orange Category, Pune, MIDC Zone) |
+| **Officer** | Sunita Deshmukh | `officer.pollution@demo.gov.in` | Maharashtra Pollution Control Board (MPCB) |
+| **Officer** | Amit Kulkarni | `officer.factory@demo.gov.in` | Directorate of Industrial Safety & Health (DISH) |
+| **Officer** | Rajesh Patil | `officer.fire@demo.gov.in` | Fire Department |
+| **Officer** | Priya Joshi | `officer.municipal@demo.gov.in` | Municipal Corporation / Planning Authority |
+| **Officer** | Meena Bhosale | `officer.midc@demo.gov.in` | MIDC Infrastructure |
+| **Officer** | Sanjay Wagh | `officer.electricity@demo.gov.in` | MSEDCL (Electricity Distribution) |
+| **Officer** | Vikram Shinde | `officer.labour@demo.gov.in` | Labour Department |
+| **Officer** | Kavita Pawar | `officer.water@demo.gov.in` | Water Resources Department |
+
+> **Login Instructions:** Visit `/login`, enter any email above, check your server terminal for the 6-digit OTP code, and enter it to log in immediately.
+
+---
 
 ## 📚 Dedicated Documentation Guides
 
-Detailed topic-by-topic documentation is available in the [`/docs`](./docs) directory:
-- 🚀 **[Project Execution & Demo Guide (docs/RUNNING_AND_DEMO.md)](./docs/RUNNING_AND_DEMO.md)** — Step-by-step installation, credentials, and 90-second synchronized live walkthrough script.
-- 🏗️ **[System Architecture, Tech Stack & Resources (docs/SYSTEM_ARCHITECTURE_AND_STACK.md)](./docs/SYSTEM_ARCHITECTURE_AND_STACK.md)** — Mermaid architecture diagrams, component boundaries, tech stack breakdown, and free/open-source tools used.
-- 🗄️ **[Database Architecture, Schema & Seed Specifications (docs/DATABASE_AND_STRUCTURE.md)](./docs/DATABASE_AND_STRUCTURE.md)** — Entity-relationship diagram (ERD), full data dictionary, enums, and pre-seeded domain records.
-- 🔄 **[API Reference, Data Flow & Domain Logic (docs/API_AND_DATA_FLOW.md)](./docs/API_AND_DATA_FLOW.md)** — End-to-end Input $\rightarrow$ Process $\rightarrow$ Output lifecycle, sequence diagrams, rules logic, and full REST endpoint documentation.
+Topic-by-topic architectural and technical guides are available in the [`/docs`](./docs) directory:
+- 🚀 **[Project Execution & Demo Walkthrough (docs/RUNNING_AND_DEMO.md)](./docs/RUNNING_AND_DEMO.md)** — Step-by-step setup, database seeding, credentials, and synchronized live demo script.
+- 🏗️ **[System Architecture, Tech Stack & Design (docs/SYSTEM_ARCHITECTURE_AND_STACK.md)](./docs/SYSTEM_ARCHITECTURE_AND_STACK.md)** — Architectural component diagrams, design decisions, and technology rationale.
+- 🗄️ **[Database Architecture, ERD & Seed Data (docs/DATABASE_AND_STRUCTURE.md)](./docs/DATABASE_AND_STRUCTURE.md)** — 13 relational models, Prisma schema, domain enums, and pre-seeded regulatory records.
+- 🔄 **[API Reference & Data Flow Pipelines (docs/API_AND_DATA_FLOW.md)](./docs/API_AND_DATA_FLOW.md)** — 26 REST endpoint specifications, sequence diagrams, and validation rules.
 
-## Tech Stack
+---
 
-- **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS v4
-- **Backend:** Next.js API Routes
-- **Database:** SQLite via Prisma ORM (easily switchable to PostgreSQL for production)
-- **Auth:** Mock OTP (logged to server console)
-- **Real-time:** Polling every 5 seconds (V2: WebSockets)
+## 🚀 Core Platform Modules & Features
 
-## Quick Setup
+### 1. Multi-Parameter Clearance Discovery Engine
+* **Deterministic Rule Engine (Zero Black-Box AI):** Matches industrial profiles against 32 regulatory rules based on sector, investment scale (MSME), CPCB/MPCB environmental pollution risk category (Red/Orange/Green/White), and notified MIDC industrial zone status (`lib/matching.ts`). Clearance decisions strictly mandate transparent, legal citations rather than probabilistic AI models.
+* **AI/NLP Research Scope:** **Phase 2: Automated regulatory text parsing (future scope)** — Future machine-assisted NLP extraction of state regulatory gazette notifications to suggest rule updates.
+* **Statutory Self-Certification Badges:** Automatically identifies low-risk Green/White category clearances eligible for deemed approvals or self-certification under Maharashtra Ease of Doing Business (EoDB) policies.
+* **Prerequisite Dependency Graph:** Functionally and visually locks downstream clearances until their prerequisite approvals are granted (e.g., Factory License and Fire NOC remain locked until Building Plan approval is completed).
 
+### 2. Central Document Vault & Pre-Application Readiness Gate
+* **"Upload Once, Attach Anywhere":** Centralized digital repository for industrial site plans, deeds, and statutory certificates, eliminating repetitive re-uploads across departments.
+* **Pre-Application Document Readiness Gate:** Prevents incomplete submissions from clogging government queues. The "Apply for Approval" button remains strictly locked with a live deficit counter until 100% of mandatory vault documents are attached.
+* **Dynamic Expiry Tracking:** Documents are dynamically evaluated on read as **Valid**, **Expiring Soon (≤ 30 days)**, or **Expired**, accompanied by a proactive dashboard expiry alert widget.
+
+### 3. Officer Scrutiny & Pre-Approval Verification Lock
+* **Department-Isolated Review Queues:** Scrutiny officers access only applications assigned to their respective department.
+* **Granular Per-Document Scrutiny:** Officers inspect uploaded files in-browser, marking each document as **Verified (✓)** or **Rejected (✕)** with official deficiency remarks.
+* **Enforced Pre-Approval Lock:** The "Approve Application" action is locked on both the UI and backend (HTTP 422) until every single mandatory document has been verified by the officer.
+
+### 4. Central Inspection System (CIS) — Joint Site Visits
+* **Synchronized Joint Site Audits:** Harmonizes physical inspection visits across MPCB, DISH, Fire Services, and Labour into a single coordinated factory visit.
+* **Multi-Officer Assignment & Duplicate Prevention:** Validates counterpart officer participation and blocks duplicate inspection scheduling for the same unit.
+* **Common Inspection Report (CIR):** Dedicated reporting interface for participating inspectors to upload joint findings and compliance observations.
+
+### 5. Citizen's Charter SLAs & State Analytics
+* **RTSA Statutory Countdown Clocks:** Real-time countdown clocks tracking statutory delivery deadlines under the Maharashtra Right to Public Services Act (RTSA), with amber alerts (≤ 5 days) and red breach tags for overdue files.
+* **State-Level Executive Intelligence:** Macro analytics dashboard aggregating state-wide SLA compliance rates, average turnaround days, department bottleneck rankings, and district-level performance heatmaps (`/analytics`).
+
+### 6. Statutory Grievance Redressal Mechanism
+* **Enforced Two-Tier Escalation:** Structured administrative appeals routing initial grievances to the **Tier-1 District Industrial Center (DIC)** and unlocking **Tier-2 State Directorate** escalation only after 7 days of unresolved pendency or upon formal rejection.
+* **Application-Linked Audit Trail:** Every grievance is tied directly to a specific clearance application with timestamped officer resolution orders.
+
+### 7. Government Incentive & Subsidy Matching Engine
+* Evaluates industrial profiles against Maharashtra Package Scheme of Incentives (PSI) policies, matching eligible MSMEs to capital subsidies, interest subventions, stamp duty waivers, and electricity duty exemptions with transparent explanations.
+
+### 8. Enterprise Identity & PII Protection
+* **AES-256-GCM Encryption at Rest:** Symmetric authenticated encryption for sensitive personal and corporate identifiers (Aadhaar, PAN) using dynamic 16-byte IVs and authentication tags (`lib/crypto.ts`).
+* **UI Masking:** Masks sensitive numbers by default across all screens (`XXXX XXXX 1234`, `XXXXXX1234`).
+* **Secured Local Storage:** Uploads are stored in a private directory (`storage/uploads/`) outside the public web root with magic-byte file signature validation and authenticated streaming.
+
+---
+
+## 🏗️ System Architecture
+
+![System Architecture](./docs/architecture.png)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           CLIENT / BROWSER                              │
+│  ┌───────────────────────────────┐     ┌─────────────────────────────┐  │
+│  │     Applicant Workspace       │     │      Officer Dashboard      │  │
+│  │  • Profile Intake (4 Steps)   │     │  • Departmental FIFO Queue  │  │
+│  │  • Approval Discovery & DAG   │     │  • In-Browser File Scrutiny │  │
+│  │  • Document Vault & Readiness │     │  • Pre-Approval Lock Guard  │  │
+│  │  • RTSA Statutory SLA Clocks  │     │  • CIS Joint Inspections    │  │
+│  │  • Scheme Matching Cards      │     │  • Grievance Resolution     │  │
+│  │  • 2-Tier Grievance Lodging   │     │  • State SLA Analytics      │  │
+│  └───────────────┬───────────────┘     └──────────────┬──────────────┘  │
+└──────────────────┼────────────────────────────────────┼─────────────────┘
+                   │ HTTP / JSON API (JWT Cookie Auth)   │
+┌──────────────────▼────────────────────────────────────▼─────────────────┐
+│                      NEXT.JS 15 (APP ROUTER) BACKEND                    │
+│  ┌───────────────────────────────────────────────────────────────────┐  │
+│  │ 26 REST Route Handlers (/app/api/*)                               │  │
+│  │ • /api/auth/* (OTP generation, verification, JWT session cookie)  │  │
+│  │ • /api/approvals/matching (Deterministic rule engine)             │  │
+│  │ • /api/applications/* (Readiness gates, submission, status sync)  │  │
+│  │ • /api/officer/* (Scrutiny queues, verify, deficiency comments)   │  │
+│  │ • /api/documents/* (Vault, secure file stream, magic-byte check)  │  │
+│  │ • /api/inspections/* (CIS joint scheduling & CIR reporting)       │  │
+│  │ • /api/grievances/* (Tier-1 / Tier-2 appellate escalation)        │  │
+│  │ • /api/analytics/sla (State SLA compliance, bottleneck rankings)  │  │
+│  └───────────────────────────────────┬───────────────────────────────┘  │
+│                                      │                                  │
+│  ┌───────────────────────────────────▼───────────────────────────────┐  │
+│  │ Core Domain Logic (/lib)                                          │  │
+│  │ • matching.ts (Rule evaluation & Scheme engine)                   │  │
+│  │ • applications.ts (Prerequisite DAG & Readiness validation)       │  │
+│  │ • documents.ts (Validity calculation: valid / expiring / expired) │  │
+│  │ • crypto.ts (AES-256-GCM cipher with dynamic IV & Auth Tag)       │  │
+│  │ • validation.ts (Enum, payload & MIME type sanitization)          │  │
+│  └───────────────────────────────────┬───────────────────────────────┘  │
+└──────────────────────────────────────┼──────────────────────────────────┘
+                                       │
+┌──────────────────────────────────────▼──────────────────────────────────┐
+│                             DATA LAYER                                  │
+│  ┌───────────────────────────────┐     ┌─────────────────────────────┐  │
+│  │  Prisma ORM (13 Models)       │     │  Private Storage Disk       │  │
+│  │  • SQLite (dev.db for local)  │     │  • storage/uploads/         │  │
+│  │  • PostgreSQL (for production)│     │  • UUID-named binary files  │  │
+│  └───────────────────────────────┘     └─────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 💻 Tech Stack
+
+* **Frontend:** Next.js 15 (App Router), React 19, Tailwind CSS v4
+* **Backend:** Next.js Server Components & Route Handlers
+* **Database & ORM:** SQLite via Prisma ORM (easily switchable to PostgreSQL)
+* **Security & Cryptography:** Node.js native `crypto` (AES-256-GCM), JWT session cookies
+* **Real-Time Sync:** 5-second polling interval between applicant and officer views
+
+---
+
+## ⚡ Quick Setup & Local Execution
+
+### 1. Prerequisites
+* **Node.js:** v18.18.0 or newer (v20+ recommended)
+* **npm:** v9.0.0 or newer
+
+### 2. Installation & Run
 ```bash
 # 1. Install dependencies
 npm install
 
-# 2. Run database migration + seed
+# 2. Initialize database migration and seed pre-configured records
 npx prisma migrate dev --name init
 
-# 3. Start the dev server
+# 3. Start the Next.js development server
 npm run dev
 ```
 
-The app will be available at **http://localhost:3000**
+Open your browser at **[http://localhost:3000](http://localhost:3000)**.
 
-> **Note:** If the database already exists, you can re-seed with:
+> **Resetting Data:** If the database already exists and you want to reset fresh demo data:
 > ```bash
 > npx prisma db seed
 > ```
 
-## Demo Accounts (pre-seeded)
-
-### Officers
-| Name | Email | Department |
-|------|-------|-----------|
-| Rajesh Patil | officer.fire@demo.gov.in | Fire Department |
-| Sunita Deshmukh | officer.pollution@demo.gov.in | MPCB (Pollution) |
-| Amit Kulkarni | officer.factory@demo.gov.in | DISH (Factory) |
-| Priya Joshi | officer.municipal@demo.gov.in | Municipal Corp |
-| Vikram Shinde | officer.labour@demo.gov.in | Labour Dept |
-| Meena Bhosale | officer.midc@demo.gov.in | MIDC |
-| Sanjay Wagh | officer.electricity@demo.gov.in | MSEDCL |
-| Kavita Pawar | officer.water@demo.gov.in | Water Resources |
-
-### Applicant
-| Name | Email |
-|------|-------|
-| Demo Applicant | applicant@demo.com |
-
-> **Auth:** Enter any email above → check terminal for the 6-digit OTP → enter it to login.
-
 ---
 
-## 90-Second Demo Script
+## 🔄 Switching to PostgreSQL (Production / MeghRaj Cloud)
 
-Open **two browser windows** side by side (or two tabs).
+For production deployment on Docker or MeghRaj/NIC Cloud:
 
-### Window 1 — Applicant Flow (60s)
-
-1. **Visit** `http://localhost:3000` → click **"Get Started"**
-2. **Login:** Enter `applicant@demo.com` → check terminal for OTP → enter OTP
-3. **Onboarding:** Fill the profile:
-   - Sector: **Manufacturing**
-   - Scale: **Small**
-   - District: **Pune**
-   - Industrial Zone: **✓ Checked**
-   - Risk Category: **Orange** (moderately polluting)
-   - Stage: **New Unit**
-4. **Dashboard appears** showing:
-   - 📋 **Required Approvals** — cards with dependency indicators, self-certifiable badges
-   - 🏦 **Matching Schemes** — cards with "why you qualify" explanations
-   - ⚡ Progress bar at the top
-5. **Submit an application:** Click **"Submit Application →"** on **"Building Plan Approval"**
-   - Notice the card status changes from "Not Started" to "Submitted"
-   - Notice that Factory License and Fire NOC show 🔒 locked (they depend on Building Plan Approval)
-
-### Window 2 — Officer Flow (30s)
-
-6. **Open new tab** → `http://localhost:3000/login`
-7. **Login as officer:** Enter `officer.municipal@demo.gov.in` → check terminal for OTP → enter OTP
-8. **Officer Dashboard** loads showing the Building Plan Approval application with:
-   - Applicant details
-   - Business info (sector, scale, district)
-   - 🟠 **Medium Risk** badge (derived from Orange risk category)
-   - Approve / Request Info / Reject buttons
-9. **Click "✓ Approve"** → application disappears from queue
-
-### Back to Window 1 — Live Update! (the wow moment)
-
-10. **Watch the applicant dashboard** — within 5 seconds, the Building Plan Approval card:
-    - Status badge changes from **"Submitted"** → **"Approved"** ✅
-    - The card turns green
-    - 📅 Renewal date appears
-    - 🔓 Factory License and Fire NOC unlock (dependency met!)
-    - Progress bar advances
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────┐
-│           Next.js App               │
-│  ┌──────────┐  ┌──────────────────┐ │
-│  │ Applicant│  │ Officer          │ │
-│  │ Dashboard│  │ Dashboard        │ │
-│  └────┬─────┘  └────┬─────────── │ │
-│       │              │              │
-│  ┌────┴──────────────┴───────────┐ │
-│  │     API Routes (/api/*)       │ │
-│  └────┬──────────────────────────┘ │
-│       │                             │
-│  ┌────┴───────────────────┐         │
-│  │  Business Logic (/lib) │         │
-│  │  • Matching Engine     │         │
-│  │  • Risk Badge Logic    │         │
-│  │  • Auth (Mock OTP)     │         │
-│  └────┬───────────────────┘         │
-│       │                             │
-│  ┌────┴─────────┐                   │
-│  │  Prisma ORM  │                   │
-│  └────┬─────────┘                   │
-└───────┼─────────────────────────────┘
-        │
-   ┌────┴────┐
-   │ SQLite  │
-   │ dev.db  │
-   └─────────┘
-```
-
-## Key Design Decisions
-
-| Decision | Rationale |
-|----------|-----------|
-| **Rules-table matching** (no ML) | Compliance-sensitive gov use case — needs full auditability |
-| **SQLite for dev** | Zero infrastructure, demoable on any laptop |
-| **Polling (not WebSockets)** | Simpler to set up with Next.js App Router; V2 upgrade noted |
-| **Mock OTP** | No paid SMS service needed for demo |
-| **Self-certification badges** | Reflects Maharashtra's real policy (20 of 33 approvals) |
-| **Dependency graph** | Factory License/Fire NOC correctly depend on Building Plan |
-
-## Seed Data
-
-- **10 Approval Types** — Maharashtra industrial approvals (MIDC, building plan, factory license, fire NOC, pollution NOC, electricity, labour, water, shops registration, GST)
-- **32 Approval Rules** — Sector/scale/risk mappings with self-certification flags
-- **8 Schemes** — Maharashtra MSME/industrial policy schemes (capital subsidy, interest subsidy, electricity duty exemption, stamp duty exemption, technology upgradation, quality certification, employment generation)
-
-> ⚠️ Scheme data uses placeholder values. See `// TODO: verify against actual Maharashtra Industrial Policy` comments in the seed file.
-
-## Switching to PostgreSQL
-
-For production, update `prisma/schema.prisma`:
+1. Update `prisma/schema.prisma`:
 ```prisma
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 ```
-And set `DATABASE_URL` in `.env`:
-```
+2. Set your production database URL in `.env`:
+```env
 DATABASE_URL="postgresql://user:password@localhost:5432/screwless"
 ```
-Then run `npx prisma migrate dev`.
+3. Run the production migration:
+```bash
+npx prisma migrate dev
+```
 
-## Statutory Compliance & Identity Data Protection (Aadhaar & DPDP Act)
+---
 
-In accordance with Indian regulatory frameworks:
-- **Aadhaar Act, 2016 & Regulations**: Storage and display of raw Aadhaar numbers is restricted. In this implementation, Aadhar and PAN identifiers are masked by default across all UI views (`XXXX XXXX 1234`, `XXXXXX1234`).
-- **Cryptographic Protection at Rest**: All Aadhar and PAN numbers are encrypted using symmetric **AES-256-GCM** before persistence to the database. Plaintext values are never logged to server consoles, telemetry, or error messages.
-- **DPDP Act (Digital Personal Data Protection Act, 2023) & UIDAI Guidelines**: A production deployment of this government platform would interface with UIDAI-authorized Authentication User Agencies (AUA/KUA) or utilize DigiLocker / Aadhaar Paperless Offline e-KYC XML/QR mechanisms rather than direct identifier storage.
+## ⏱️ 90-Second Synchronized Live Demo Script
 
-## Out of Scope (V2)
-- AI/ML-based document verification
-- Real SMS/email OTP
-- Payment gateway
-- Government API integration
-- Analytics/reporting dashboards
-- Multi-language support
-- WebSocket real-time (currently polling)
+Open **two browser windows side by side** (one for the Applicant, one for the Officer).
+
+### Window 1 — Applicant Flow
+1. Visit `http://localhost:3000/login` → Enter `applicant@demo.com` → Check server terminal for the 6-digit OTP → Enter OTP.
+2. Complete Profile Intake: Manufacturing / Small / Pune / MIDC Notified Zone / Orange Pollution Category / New Unit.
+3. Dashboard loads showing:
+   - **Required Approvals:** Notice Building Plan Approval is available, while Factory License and Fire NOC show 🔒 locked (prerequisite dependency).
+   - **Pre-Application Readiness Gate:** Click on Building Plan Approval. Notice the "Apply for Approval" button is locked: *"Complete required documents before applying"*.
+   - **Document Vault:** Upload the required Land Ownership Proof and Building Plan Copy to the Document Vault.
+   - **Ready to Apply:** Document readiness reaches 100%. The "Apply for Approval →" button turns blue. Click to submit!
+   - Notice the status updates to "Submitted" and the **RTSA Statutory SLA Countdown Timer** starts ticking live.
+
+### Window 2 — Officer Flow
+4. In the second window, visit `http://localhost:3000/login` → Enter `officer.municipal@demo.gov.in` → Enter terminal OTP.
+5. The Municipal Corporation Officer Queue displays the newly submitted Building Plan application with an Orange Medium Risk badge.
+6. Click the application to open the **Scrutiny & Verification Workspace**:
+   - Notice the **"Approve Application" button is disabled**: *"🔒 Approval locked: Verify all mandatory documents first"*.
+   - Inspect the submitted site plan and layout files.
+   - Click **"✓ Verify"** on each mandatory document.
+   - Once all mandatory files are verified, the "Approve Application" button turns green!
+   - Click **"Approve Application"** → Confirm modal.
+
+### Live Synchronized Update
+7. Look back at **Window 1 (Applicant)**:
+   - Within 5 seconds, Building Plan Approval status transitions from "Submitted" to **"Approved" ✅**.
+   - Downstream approvals (**Factory License** and **Fire NOC**) instantly **unlock 🔓** because the prerequisite approval is met!
+   - Overall compliance progress bar advances.
+
+---
+
+## 🔮 Future Roadmap (Phase 2)
+
+* **Phase 2: Automated regulatory text parsing (future scope)** — Machine-assisted parsing of government regulatory gazettes and state notifications to automatically suggest rule updates.
+* **Production SMS / Email Gateway:** CDAC Mobile Seva / Twilio integration for live OTP delivery to citizen mobile devices.
+* **DigiLocker & e-Pramaan SSO:** Direct import of verified citizen and enterprise certificates (Aadhaar, Udyam MSME, Incorporation, Land 7/12 extract).
+* **Automated Compliance Renewals:** One-click statutory renewal submission engine unlocking 60 days prior to license expiry.
+* **WebSocket Real-Time Event Bus:** Instant duplex push notifications replacing the 5-second polling interval.
+* **Multi-Language Support (i18n):** Localization in Marathi, Hindi, and English.
