@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import LoadingSpinner from '@/components/LoadingSpinner'
 
@@ -10,13 +10,48 @@ export default function LoginPage() {
   const [otp, setOtp] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [otpSent, setOtpSent] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
   const router = useRouter()
+
+  // Requirement 4: Check if already authenticated before showing login
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) {
+          if (data.user.role === 'officer') {
+            router.replace('/officer')
+          } else if (!data.hasProfile) {
+            router.replace('/onboarding')
+          } else {
+            router.replace('/dashboard')
+          }
+        } else {
+          setCheckingAuth(false)
+        }
+      })
+      .catch(() => {
+        setCheckingAuth(false)
+      })
+  }, [router])
+
+  // Countdown timer for resend cooldown
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => {
+      setResendCooldown(prev => (prev > 1 ? prev - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
     try {
@@ -26,11 +61,19 @@ export default function LoginPage() {
         body: JSON.stringify({ identifier: identifier.trim() }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to send OTP')
+      const isJson = res.headers.get('content-type')?.includes('application/json')
+      const data = isJson ? await res.json() : null
+
+      if (!res.ok) {
+        if (data?.cooldownSeconds) {
+          setResendCooldown(data.cooldownSeconds)
+        }
+        throw new Error(data?.error || `Failed to send OTP (Status ${res.status})`)
+      }
 
       setStep('otp')
       setOtpSent(true)
+      setResendCooldown(30)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -41,6 +84,7 @@ export default function LoginPage() {
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSuccess('')
     setLoading(true)
 
     try {
@@ -54,22 +98,30 @@ export default function LoginPage() {
         }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Verification failed')
+      const isJson = res.headers.get('content-type')?.includes('application/json')
+      const data = isJson ? await res.json() : null
+
+      if (!res.ok) {
+        throw new Error(data?.error || `Verification failed (Status ${res.status})`)
+      }
 
       // Save user session for instant Navbar hydration
       try {
-        localStorage.setItem('screwless_user', JSON.stringify(data.user))
-        window.dispatchEvent(new CustomEvent('auth-change', { detail: data.user }))
+        const userToStore = { ...data.user, hasProfile: !!data.hasProfile }
+        localStorage.setItem('screwless_user', JSON.stringify(userToStore))
+        window.dispatchEvent(new CustomEvent('auth-change', { detail: userToStore }))
       } catch {}
 
-      // Redirect based on role and profile
+      // Routing logic:
+      // Officers -> /officer
+      // New applicants without completed profile -> /onboarding
+      // Returning applicants who completed onboarding -> /dashboard
       if (data.user.role === 'officer') {
         router.push('/officer')
-      } else if (data.hasProfile) {
-        router.push('/dashboard')
-      } else {
+      } else if (!data.hasProfile) {
         router.push('/onboarding')
+      } else {
+        router.push('/dashboard')
       }
     } catch (err: any) {
       setError(err.message)
@@ -79,21 +131,43 @@ export default function LoginPage() {
   }
 
   const handleResendOTP = async () => {
+    if (resendCooldown > 0) return
     setOtp('')
     setError('')
+    setSuccess('')
     setLoading(true)
     try {
-      await fetch('/api/auth/send-otp', {
+      const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: identifier.trim() }),
       })
-      setError('')
-    } catch {
-      setError('Failed to resend OTP')
+
+      const isJson = res.headers.get('content-type')?.includes('application/json')
+      const data = isJson ? await res.json() : null
+
+      if (!res.ok) {
+        if (data?.cooldownSeconds) {
+          setResendCooldown(data.cooldownSeconds)
+        }
+        throw new Error(data?.error || 'Failed to resend OTP')
+      }
+
+      setSuccess('New OTP generated! Check server terminal console.')
+      setResendCooldown(30)
+    } catch (err: any) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    )
   }
 
   return (
@@ -108,6 +182,13 @@ export default function LoginPage() {
             <h2 className="text-2xl font-bold text-gray-900">Welcome to Screwless</h2>
             <p className="text-gray-500 mt-1">Sign in to manage your industrial approvals</p>
           </div>
+
+          {/* Success message */}
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              {success}
+            </div>
+          )}
 
           {/* Error message */}
           {error && (
@@ -134,13 +215,49 @@ export default function LoginPage() {
                   autoFocus
                 />
               </div>
+
+              {/* Demo quick-select chips */}
+              <div className="mb-5">
+                <p className="text-xs text-gray-500 font-medium mb-2">⚡ Quick-fill demo account:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setIdentifier('applicant@demo.com')}
+                    className="text-xs px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md border border-blue-200 hover:bg-blue-100 transition-colors"
+                  >
+                    🏢 Demo Applicant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIdentifier('officer.pollution@demo.gov.in')}
+                    className="text-xs px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
+                    🛡️ MPCB
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIdentifier('officer.factory@demo.gov.in')}
+                    className="text-xs px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
+                    🏭 DISH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIdentifier('officer.fire@demo.gov.in')}
+                    className="text-xs px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
+                    🚒 Fire
+                  </button>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading || !identifier.trim()}
-                className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
                 {loading ? <LoadingSpinner size="sm" /> : null}
-                {loading ? 'Sending...' : 'Send OTP'}
+                {loading ? 'Sending OTP...' : 'Send OTP →'}
               </button>
             </form>
           ) : (
@@ -155,30 +272,16 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <div className="mb-4">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                  Your Name <span className="text-gray-400">(optional)</span>
-                </label>
-                <input
-                  id="name"
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your full name"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-                />
-              </div>
-
-              <div className="mb-4">
+              <div className="mb-5">
                 <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-1">
-                  Enter OTP
+                  Enter 6-Digit OTP
                 </label>
                 <input
                   id="otp"
                   type="text"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Enter 6-digit OTP"
+                  placeholder="------"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400 text-center text-2xl tracking-[0.5em] font-mono"
                   maxLength={6}
                   required
@@ -189,7 +292,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
                 {loading ? <LoadingSpinner size="sm" /> : null}
                 {loading ? 'Verifying...' : 'Verify & Sign In'}
@@ -198,17 +301,18 @@ export default function LoginPage() {
               <div className="mt-4 flex justify-between items-center text-sm">
                 <button
                   type="button"
-                  onClick={() => { setStep('identifier'); setOtp(''); setError('') }}
+                  onClick={() => { setStep('identifier'); setOtp(''); setError(''); setSuccess('') }}
                   className="text-gray-500 hover:text-gray-700"
                 >
-                  ← Change number/email
+                  ← Change email/phone
                 </button>
                 <button
                   type="button"
                   onClick={handleResendOTP}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  disabled={loading || resendCooldown > 0}
+                  className="text-blue-600 hover:text-blue-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Resend OTP
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
               </div>
             </form>

@@ -23,9 +23,11 @@ export async function POST(request: NextRequest) {
 
     const cleanId = identifier.trim()
     const isEmail = cleanId.includes('@')
+    // Normalize phone number (strip country code +91, spaces, hyphens)
+    const normalizedPhone = !isEmail ? cleanId.replace(/[\s\-]/g, '').replace(/^\+91/, '').replace(/^0/, '') : cleanId
     const whereClause = isEmail
       ? { email: cleanId.toLowerCase() }
-      : { phone: cleanId }
+      : { phone: normalizedPhone }
 
     let user = await prisma.user.findFirst({ where: whereClause })
 

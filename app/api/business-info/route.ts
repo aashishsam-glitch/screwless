@@ -10,7 +10,27 @@ export async function GET(request: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-    const info = await prisma.businessInfo.findUnique({ where: { userId: user.id } })
+    let info = await prisma.businessInfo.findUnique({ where: { userId: user.id } })
+    if (!info) {
+      const profile = await prisma.applicantProfile.findUnique({ where: { userId: user.id } })
+      if (profile && user.name) {
+        const lower = user.name.toLowerCase()
+        const businessType = lower.includes('llp')
+          ? 'llp'
+          : lower.includes('partnership')
+          ? 'partnership'
+          : lower.includes('proprietor')
+          ? 'proprietorship'
+          : 'pvt_ltd'
+        info = await prisma.businessInfo.create({
+          data: {
+            userId: user.id,
+            businessName: user.name,
+            businessType,
+          },
+        })
+      }
+    }
     return NextResponse.json({ businessInfo: info })
   } catch (error) {
     console.error('Get business info error:', error)

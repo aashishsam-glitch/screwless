@@ -82,6 +82,12 @@ export default function OnboardingPage() {
           return
         }
 
+        // Returning applicants who have already completed onboarding should go directly to /dashboard
+        if (authData?.hasProfile && typeof window !== 'undefined' && !window.location.search.includes('edit=true')) {
+          router.replace('/dashboard')
+          return
+        }
+
         // 2. Load existing profile data if user already has one
         const profileRes = await fetch('/api/profile')
         const profileContentType = profileRes.headers.get('content-type') || ''
@@ -160,15 +166,14 @@ export default function OnboardingPage() {
 
       // Sync user session in localStorage & notify Navbar
       try {
+        const cached = localStorage.getItem('screwless_user')
+        const parsed = cached ? JSON.parse(cached) : {}
         if (data?.profile?.name) {
-          const cached = localStorage.getItem('screwless_user')
-          if (cached) {
-            const parsed = JSON.parse(cached)
-            parsed.name = data.profile.name
-            localStorage.setItem('screwless_user', JSON.stringify(parsed))
-            window.dispatchEvent(new CustomEvent('auth-change', { detail: parsed }))
-          }
+          parsed.name = data.profile.name
         }
+        parsed.hasProfile = true
+        localStorage.setItem('screwless_user', JSON.stringify(parsed))
+        window.dispatchEvent(new CustomEvent('auth-change', { detail: parsed }))
       } catch {}
 
       setTimeout(() => {
