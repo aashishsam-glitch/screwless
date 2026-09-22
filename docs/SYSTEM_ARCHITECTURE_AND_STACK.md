@@ -6,6 +6,8 @@ This document outlines the architectural blueprint, technology decisions, compon
 
 ## 1. System Architecture Diagram
 
+![System Architecture](./architecture.png)
+
 ```mermaid
 flowchart TB
     subgraph ClientTier ["Client Tier (Browser / React 19)"]
@@ -65,6 +67,7 @@ flowchart TB
 
 1. **Deterministic & Explainable Compliance Logic**:
    - **No Black-Box AI/ML**: In legal compliance and government statutory approvals, decisions require explicit regulatory justification. All checklist generation and scheme eligibility use transparent, auditable rules tables.
+   - **Phase 2: Automated regulatory text parsing (future scope)**: Planned future research for machine-assisted parsing of government regulatory gazettes into rule updates without black-box inference in live decisions.
 2. **Unified Full-Stack Repository**:
    - Next.js 15 App Router serves both frontend views and backend REST API route handlers, avoiding microservice synchronization overhead for hackathon speed and local portability.
 3. **Stateless Session Management**:
