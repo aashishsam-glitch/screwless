@@ -14,16 +14,17 @@ export default function Home() {
         throw new Error('Not authenticated')
       })
       .then(data => {
-        if (data.user.role === 'officer') {
-          router.push('/officer')
-        } else if (data.hasProfile) {
-          router.push('/dashboard')
+        if (data?.user?.role === 'officer') {
+          router.replace('/officer')
+        } else if (!data?.hasProfile) {
+          router.replace('/onboarding')
         } else {
-          router.push('/onboarding')
+          router.replace('/dashboard')
         }
       })
       .catch(() => {
-        // Not authenticated, stay on landing page
+        // Unauthenticated user: must only see the login/signup flow
+        router.replace('/login')
       })
   }, [router])
 

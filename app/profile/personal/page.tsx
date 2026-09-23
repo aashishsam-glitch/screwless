@@ -58,31 +58,45 @@ export default function PersonalInfoPage() {
     throw new Error(fallback)
   }
 
+  const [industrialProfile, setIndustrialProfile] = useState<any>(null)
+
   // Load existing data
   useEffect(() => {
     const loadData = async () => {
       try {
         const authRes = await fetch('/api/auth/me')
         if (!authRes.ok) { router.push('/login'); return }
+        const authData = await authRes.json()
 
-        const [pRes, bRes] = await Promise.all([
+        const [pRes, bRes, profileRes] = await Promise.all([
           fetch('/api/personal-info'),
           fetch('/api/business-info'),
+          fetch('/api/profile'),
         ])
+
+        let profileData: any = null
+        if (profileRes.ok) {
+          profileData = await parseSafeJson(profileRes).catch(() => null)
+          if (profileData?.profile) {
+            setIndustrialProfile(profileData.profile)
+          }
+        }
 
         if (pRes.ok) {
           const pData = await parseSafeJson(pRes).catch(() => null)
           if (pData?.personalInfo) {
             const p = pData.personalInfo
+            const fallbackAddress = profileData?.profile
+              ? `${profileData.profile.locationDistrict}${profileData.profile.inNotifiedIndustrialZone ? ', Notified Industrial Zone (MIDC)' : ''}, Maharashtra`
+              : ''
             setPersonal(prev => ({
               ...prev,
-              fullName: p.fullName || '',
+              fullName: p.fullName || authData?.user?.name || profileData?.profile?.name || '',
               dob: p.dob || '',
-              address: p.address || '',
-              contactEmail: p.contactEmail || '',
-              contactPhone: p.contactPhone || '',
+              address: p.address || fallbackAddress,
+              contactEmail: p.contactEmail || authData?.user?.email || '',
+              contactPhone: p.contactPhone || authData?.user?.phone || '',
               alternateContact: p.alternateContact || '',
-              // Don't populate aadhar/pan - they're masked
             }))
             setMaskedAadhar(p.aadhar)
             setMaskedPan(p.pan)
@@ -95,7 +109,7 @@ export default function PersonalInfoPage() {
           if (bData?.businessInfo) {
             const b = bData.businessInfo
             setBusiness({
-              businessName: b.businessName || '',
+              businessName: b.businessName || profileData?.profile?.name || authData?.user?.name || '',
               businessType: b.businessType || '',
               gstin: b.gstin || '',
               udyamRegistrationNumber: b.udyamRegistrationNumber || '',
@@ -323,6 +337,49 @@ export default function PersonalInfoPage() {
             </div>
           </div>
         </div>
+
+        {/* Synchronized Company & Industrial Profile Section */}
+        {industrialProfile && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-sm font-bold text-emerald-700">IN</span>
+                Company & Industrial Profile
+              </h2>
+              <a
+                href="/onboarding?edit=true"
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+              >
+                Edit in Onboarding →
+              </a>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span className="text-gray-500 text-xs block">Industry Sector</span>
+                <span className="font-medium text-gray-900 capitalize">{industrialProfile.sector?.replace(/_/g, ' ') || 'Not specified'}</span>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span className="text-gray-500 text-xs block">Enterprise Scale</span>
+                <span className="font-medium text-gray-900 capitalize">{industrialProfile.scale || 'Not specified'}</span>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span className="text-gray-500 text-xs block">Location & Industrial Zone</span>
+                <span className="font-medium text-gray-900">
+                  {industrialProfile.locationDistrict || 'Maharashtra'}
+                  {industrialProfile.inNotifiedIndustrialZone ? ' (MIDC Notified Zone)' : ' (Non-MIDC)'}
+                </span>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span className="text-gray-500 text-xs block">CPCB Pollution Risk Category</span>
+                <span className="font-medium text-gray-900 capitalize">{industrialProfile.riskCategory || 'Not specified'}</span>
+              </div>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 md:col-span-2">
+                <span className="text-gray-500 text-xs block">Business Stage</span>
+                <span className="font-medium text-gray-900 capitalize">{industrialProfile.stage?.replace(/_/g, ' ') || 'New Unit'}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Security notice */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">

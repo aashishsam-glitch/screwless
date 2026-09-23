@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
       where: { userId: user.id },
     })
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found. Complete onboarding first.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Profile not found. Please complete onboarding first.' },
+        { status: 404 }
+      )
     }
 
     const approvals = await getMatchingApprovals(profile, user.id)

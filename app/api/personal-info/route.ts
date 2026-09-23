@@ -10,7 +10,24 @@ export async function GET(request: NextRequest) {
     const user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
-    const info = await prisma.personalInfo.findUnique({ where: { userId: user.id } })
+    let info = await prisma.personalInfo.findUnique({ where: { userId: user.id } })
+    if (!info) {
+      const profile = await prisma.applicantProfile.findUnique({ where: { userId: user.id } })
+      if (profile || user.name || user.email || user.phone) {
+        const address = profile
+          ? `${profile.locationDistrict}${profile.inNotifiedIndustrialZone ? ', Notified Industrial Zone (MIDC)' : ''}, Maharashtra`
+          : null
+        info = await prisma.personalInfo.create({
+          data: {
+            userId: user.id,
+            fullName: user.name || 'Applicant',
+            contactEmail: user.email || null,
+            contactPhone: user.phone || null,
+            address,
+          },
+        })
+      }
+    }
     if (!info) return NextResponse.json({ personalInfo: null })
 
     const reveal = request.nextUrl.searchParams.get('reveal') === 'true'

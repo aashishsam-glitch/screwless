@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'OTP sent successfully. Check the server console for the OTP code.',
+      devOtp: process.env.NODE_ENV !== 'production' ? result.code : undefined,
     })
   } catch (error) {
     console.error('Send OTP error:', error)

@@ -90,20 +90,21 @@ export default function DashboardPage() {
         // Check auth
         const authRes = await fetch('/api/auth/me')
         if (!authRes.ok) {
-          router.push('/login')
+          router.replace('/login')
           return
         }
         const authData = await authRes.json()
         try {
-          localStorage.setItem('screwless_user', JSON.stringify(authData.user))
-          window.dispatchEvent(new CustomEvent('auth-change', { detail: authData.user }))
+          const userToStore = { ...authData.user, hasProfile: !!authData.hasProfile }
+          localStorage.setItem('screwless_user', JSON.stringify(userToStore))
+          window.dispatchEvent(new CustomEvent('auth-change', { detail: userToStore }))
         } catch {}
         if (authData.user.role === 'officer') {
-          router.push('/officer')
+          router.replace('/officer')
           return
         }
         if (!authData.hasProfile) {
-          router.push('/onboarding')
+          router.replace('/onboarding')
           return
         }
 

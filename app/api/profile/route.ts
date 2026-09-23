@@ -186,6 +186,70 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Automatically synchronize company & industrial profile details into Personal Information
+    const formattedAddress = `${districtStr}${isZone ? ', Notified Industrial Zone (MIDC)' : ''}, Maharashtra`
+
+    // 1. Synchronize PersonalInfo without overwriting unrelated fields
+    const existingPersonal = await prisma.personalInfo.findUnique({
+      where: { userId: user.id },
+    })
+
+    if (existingPersonal) {
+      await prisma.personalInfo.update({
+        where: { userId: user.id },
+        data: {
+          fullName: enterpriseName || existingPersonal.fullName || user.name || 'Applicant',
+          contactEmail: existingPersonal.contactEmail || user.email || null,
+          contactPhone: existingPersonal.contactPhone || user.phone || null,
+          address: formattedAddress,
+        },
+      })
+    } else {
+      await prisma.personalInfo.create({
+        data: {
+          userId: user.id,
+          fullName: enterpriseName || user.name || 'Applicant',
+          contactEmail: user.email || null,
+          contactPhone: user.phone || null,
+          address: formattedAddress,
+        },
+      })
+    }
+
+    // 2. Synchronize BusinessInfo without overwriting unrelated fields
+    const existingBusiness = await prisma.businessInfo.findUnique({
+      where: { userId: user.id },
+    })
+
+    const detectBusinessType = (bizName: string): 'proprietorship' | 'partnership' | 'pvt_ltd' | 'llp' | 'other' => {
+      const lower = bizName.toLowerCase()
+      if (lower.includes('pvt') || lower.includes('private limited')) return 'pvt_ltd'
+      if (lower.includes('llp')) return 'llp'
+      if (lower.includes('partnership')) return 'partnership'
+      if (lower.includes('proprietor')) return 'proprietorship'
+      return 'pvt_ltd'
+    }
+
+    const resolvedBizName = enterpriseName || existingBusiness?.businessName || user.name || 'Enterprise'
+    const resolvedBizType = existingBusiness?.businessType || detectBusinessType(resolvedBizName)
+
+    if (existingBusiness) {
+      await prisma.businessInfo.update({
+        where: { userId: user.id },
+        data: {
+          businessName: enterpriseName || existingBusiness.businessName,
+        },
+      })
+    } else {
+      await prisma.businessInfo.create({
+        data: {
+          userId: user.id,
+          businessName: resolvedBizName,
+          businessType: resolvedBizType,
+        },
+      })
+    }
+
     return NextResponse.json(
       {
         success: true,
